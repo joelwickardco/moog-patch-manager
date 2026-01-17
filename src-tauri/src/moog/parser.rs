@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// Parsed patch data from filesystem
 pub struct ParsedPatch {
@@ -31,6 +31,39 @@ pub struct ParsedLibrary {
     pub warnings: Vec<String>,
 }
 
+/// Find the library/ directory, handling both direct and nested ZIP structures
+/// Supports:
+///   - Direct: extracted_dir/library/
+///   - Nested: extracted_dir/SomeFolder/library/
+fn find_library_dir(base_path: &Path) -> Result<PathBuf, String> {
+    // First, check if library/ exists directly
+    let direct_library = base_path.join("library");
+    if direct_library.exists() && direct_library.is_dir() {
+        return Ok(direct_library);
+    }
+
+    // Otherwise, look for a single subdirectory containing library/
+    if let Ok(entries) = fs::read_dir(base_path) {
+        let subdirs: Vec<_> = entries
+            .filter_map(|e| e.ok())
+            .filter(|e| {
+                let path = e.path();
+                path.is_dir() && !e.file_name().to_string_lossy().starts_with('.')
+            })
+            .collect();
+
+        // Check each subdirectory for a library/ folder
+        for subdir in &subdirs {
+            let nested_library = subdir.path().join("library");
+            if nested_library.exists() && nested_library.is_dir() {
+                return Ok(nested_library);
+            }
+        }
+    }
+
+    Err("Missing 'library/' directory. Expected either 'library/' at root or inside a single folder.".to_string())
+}
+
 /// Parse a Moog library directory structure
 pub fn parse_library(library_path: &Path) -> Result<ParsedLibrary, String> {
     let mut result = ParsedLibrary {
@@ -40,11 +73,8 @@ pub fn parse_library(library_path: &Path) -> Result<ParsedLibrary, String> {
         warnings: Vec::new(),
     };
 
-    // Check for library/ root directory
-    let library_dir = library_path.join("library");
-    if !library_dir.exists() {
-        return Err("Missing 'library/' root directory".to_string());
-    }
+    // Check for library/ root directory - handle both direct and nested structures
+    let library_dir = find_library_dir(library_path)?;
 
     // Parse all 16 banks
     for bank_num in 1..=16 {

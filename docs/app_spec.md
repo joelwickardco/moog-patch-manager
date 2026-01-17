@@ -1,6 +1,6 @@
 # Moog Muse Patch Manager - Application Specification
 
-**Version:** 1.1
+**Version:** 1.2
 **Last Updated:** January 17, 2026  
 **Target Platforms:** macOS (primary), Linux (secondary)
 
@@ -410,9 +410,6 @@ async fn update_library(
 
 #[tauri::command]
 async fn delete_library(id: i64) -> Result<(), String>
-
-#[tauri::command]
-async fn get_library_statistics(id: i64) -> Result<LibraryStats, String>
 ```
 
 **LibraryDto Structure:**
@@ -421,23 +418,12 @@ struct LibraryDto {
     id: i64,
     name: String,
     description: Option<String>,
-    source_filename: String,
+    source_filename: Option<String>,
     color: Option<String>,
     patch_count: i64,
     sequence_count: i64,
     created_at: String,
     updated_at: String,
-}
-```
-
-**LibraryStats Structure:**
-```rust
-struct LibraryStats {
-    total_patches: i64,
-    total_sequences: i64,
-    total_size_bytes: i64,
-    categories_used: Vec<CategoryDto>,
-    favorited_patches: i64,
 }
 ```
 
@@ -1484,6 +1470,7 @@ jobs:
 |---------|------|--------|---------|
 | 1.0 | 2026-01-12 | Initial | Complete application specification |
 | 1.1 | 2026-01-17 | Update | Added multi-library support: libraries table, library filtering, import workflow with ZIP filename as library name |
+| 1.2 | 2026-01-17 | Update | Removed unimplemented get_library_statistics command; fixed LibraryDto.source_filename to Option<String> |
 
 ---
 

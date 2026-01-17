@@ -2,7 +2,9 @@
   let {
     activeTab = $bindable(),
     libraries = [],
-    selectedLibraryId = $bindable()
+    selectedLibraryId = $bindable(),
+    onImport = () => {},
+    importing = false
   } = $props();
 
   const tabs = [
@@ -87,8 +89,12 @@
   </nav>
 
   <div class="p-4 border-t border-border space-y-2">
-    <button class="w-full px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
-      Import
+    <button
+      class="w-full px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      onclick={onImport}
+      disabled={importing}
+    >
+      {importing ? "Importing..." : "Import"}
     </button>
     <button class="w-full px-4 py-2 bg-secondary text-white rounded-lg hover:bg-secondary/90 transition-colors">
       Export
