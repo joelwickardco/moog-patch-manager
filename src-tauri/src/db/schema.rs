@@ -1,7 +1,21 @@
 pub const SCHEMA: &str = r#"
+-- Source libraries (imported ZIP archives)
+CREATE TABLE IF NOT EXISTS libraries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    description TEXT,
+    source_filename TEXT,
+    color TEXT,
+    patch_count INTEGER DEFAULT 0,
+    sequence_count INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Core patch storage
 CREATE TABLE IF NOT EXISTS patches (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    library_id INTEGER NOT NULL,
     name TEXT NOT NULL,
     file_data BLOB NOT NULL,
     file_hash TEXT NOT NULL UNIQUE,
@@ -9,19 +23,22 @@ CREATE TABLE IF NOT EXISTS patches (
     is_favorite BOOLEAN DEFAULT 0,
     notes TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (library_id) REFERENCES libraries(id) ON DELETE CASCADE
 );
 
 -- Sequence storage (independent of patches)
 CREATE TABLE IF NOT EXISTS sequences (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    library_id INTEGER NOT NULL,
     name TEXT NOT NULL,
     file_data BLOB NOT NULL,
     file_hash TEXT NOT NULL UNIQUE,
     file_size INTEGER NOT NULL,
     notes TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (library_id) REFERENCES libraries(id) ON DELETE CASCADE
 );
 
 -- User-defined categories (app-only, not in Moog)
@@ -85,9 +102,12 @@ CREATE TABLE IF NOT EXISTS bank_sequences (
 );
 
 -- Indexes for performance
+CREATE INDEX IF NOT EXISTS idx_libraries_name ON libraries(name COLLATE NOCASE);
+CREATE INDEX IF NOT EXISTS idx_patches_library ON patches(library_id);
 CREATE INDEX IF NOT EXISTS idx_patches_favorite ON patches(is_favorite);
 CREATE INDEX IF NOT EXISTS idx_patches_name ON patches(name COLLATE NOCASE);
 CREATE INDEX IF NOT EXISTS idx_patches_hash ON patches(file_hash);
+CREATE INDEX IF NOT EXISTS idx_sequences_library ON sequences(library_id);
 CREATE INDEX IF NOT EXISTS idx_sequences_name ON sequences(name COLLATE NOCASE);
 CREATE INDEX IF NOT EXISTS idx_sequences_hash ON sequences(file_hash);
 CREATE INDEX IF NOT EXISTS idx_patch_categories_patch ON patch_categories(patch_id);

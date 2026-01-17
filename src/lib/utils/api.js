@@ -1,5 +1,22 @@
 import { invoke } from "@tauri-apps/api/core";
 
+// Library operations
+export async function getAllLibraries() {
+  return invoke("get_all_libraries");
+}
+
+export async function getLibraryById(id) {
+  return invoke("get_library_by_id", { id });
+}
+
+export async function updateLibrary(id, name = null, description = null, color = null) {
+  return invoke("update_library", { id, name, description, color });
+}
+
+export async function deleteLibrary(id) {
+  return invoke("delete_library", { id });
+}
+
 // Patch operations
 export async function getAllPatches(filter = null) {
   return invoke("get_all_patches", { filter });

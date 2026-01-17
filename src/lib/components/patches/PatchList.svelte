@@ -1,13 +1,13 @@
 <script>
   import PatchCard from "./PatchCard.svelte";
   import SearchBar from "../common/SearchBar.svelte";
+  import { getAllPatches } from "../../utils/api.js";
 
-  // Placeholder data - will be replaced with Tauri commands
-  let patches = $state([
-    { id: 1, name: "Deep Bass", is_favorite: true, categories: ["Bass"], notes: "A warm analog bass" },
-    { id: 2, name: "Cathedral Pad", is_favorite: false, categories: ["Pad"], notes: "" },
-    { id: 3, name: "Screaming Lead", is_favorite: true, categories: ["Lead"], notes: "High gain lead sound" },
-  ]);
+  let { selectedLibraryId = null } = $props();
+
+  let patches = $state([]);
+  let loading = $state(true);
+  let error = $state(null);
 
   let searchQuery = $state("");
   let viewMode = $state("grid"); // 'grid' or 'list'
@@ -15,6 +15,27 @@
   let filteredPatches = $derived(
     patches.filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
   );
+
+  async function loadPatches() {
+    loading = true;
+    error = null;
+    try {
+      const filter = selectedLibraryId ? { library_id: selectedLibraryId } : null;
+      patches = await getAllPatches(filter);
+    } catch (e) {
+      error = e.toString();
+      patches = [];
+    } finally {
+      loading = false;
+    }
+  }
+
+  // Load patches on mount and when selectedLibraryId changes
+  $effect(() => {
+    // Track the dependency
+    const libraryId = selectedLibraryId;
+    loadPatches();
+  });
 </script>
 
 <div class="h-full flex flex-col">
@@ -40,7 +61,16 @@
   </header>
 
   <div class="flex-1 overflow-auto p-4">
-    {#if filteredPatches.length === 0}
+    {#if loading}
+      <div class="text-center text-text-secondary py-12">
+        <p class="text-lg">Loading patches...</p>
+      </div>
+    {:else if error}
+      <div class="text-center text-red-500 py-12">
+        <p class="text-lg">Error loading patches</p>
+        <p class="text-sm mt-2">{error}</p>
+      </div>
+    {:else if filteredPatches.length === 0}
       <div class="text-center text-text-secondary py-12">
         <p class="text-lg">No patches found</p>
         <p class="text-sm mt-2">Import patches to get started</p>

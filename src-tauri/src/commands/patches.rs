@@ -13,21 +13,30 @@ pub async fn get_all_patches(
 
     let filter = filter.unwrap_or_default();
     let mut sql = String::from(
-        "SELECT id, name, file_hash, file_size, is_favorite, notes, created_at, updated_at FROM patches WHERE 1=1"
+        "SELECT p.id, p.library_id, l.name as library_name, p.name, p.file_hash, p.file_size,
+                p.is_favorite, p.notes, p.created_at, p.updated_at
+         FROM patches p
+         JOIN libraries l ON p.library_id = l.id
+         WHERE 1=1"
     );
     let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
 
+    if let Some(library_id) = filter.library_id {
+        sql.push_str(" AND p.library_id = ?");
+        params_vec.push(Box::new(library_id));
+    }
+
     if let Some(is_fav) = filter.is_favorite {
-        sql.push_str(" AND is_favorite = ?");
+        sql.push_str(" AND p.is_favorite = ?");
         params_vec.push(Box::new(is_fav));
     }
 
     if let Some(ref name_contains) = filter.name_contains {
-        sql.push_str(" AND name LIKE ?");
+        sql.push_str(" AND p.name LIKE ?");
         params_vec.push(Box::new(format!("%{}%", name_contains)));
     }
 
-    sql.push_str(" ORDER BY name COLLATE NOCASE");
+    sql.push_str(" ORDER BY p.name COLLATE NOCASE");
 
     let params_refs: Vec<&dyn rusqlite::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
 
@@ -36,14 +45,16 @@ pub async fn get_all_patches(
         .query_map(params_refs.as_slice(), |row| {
             Ok(PatchDto {
                 id: row.get(0)?,
-                name: row.get(1)?,
-                file_hash: row.get(2)?,
-                file_size: row.get(3)?,
-                is_favorite: row.get(4)?,
-                notes: row.get(5)?,
+                library_id: row.get(1)?,
+                library_name: row.get(2)?,
+                name: row.get(3)?,
+                file_hash: row.get(4)?,
+                file_size: row.get(5)?,
+                is_favorite: row.get(6)?,
+                notes: row.get(7)?,
                 categories: Vec::new(), // Will be populated below
-                created_at: row.get(6)?,
-                updated_at: row.get(7)?,
+                created_at: row.get(8)?,
+                updated_at: row.get(9)?,
             })
         })
         .map_err(|e| e.to_string())?;
@@ -72,19 +83,25 @@ pub async fn get_patch_by_id(state: State<'_, AppState>, id: i64) -> Result<Patc
 
     let mut patch: PatchDto = conn
         .query_row(
-            "SELECT id, name, file_hash, file_size, is_favorite, notes, created_at, updated_at FROM patches WHERE id = ?1",
+            "SELECT p.id, p.library_id, l.name as library_name, p.name, p.file_hash, p.file_size,
+                    p.is_favorite, p.notes, p.created_at, p.updated_at
+             FROM patches p
+             JOIN libraries l ON p.library_id = l.id
+             WHERE p.id = ?1",
             params![id],
             |row| {
                 Ok(PatchDto {
                     id: row.get(0)?,
-                    name: row.get(1)?,
-                    file_hash: row.get(2)?,
-                    file_size: row.get(3)?,
-                    is_favorite: row.get(4)?,
-                    notes: row.get(5)?,
+                    library_id: row.get(1)?,
+                    library_name: row.get(2)?,
+                    name: row.get(3)?,
+                    file_hash: row.get(4)?,
+                    file_size: row.get(5)?,
+                    is_favorite: row.get(6)?,
+                    notes: row.get(7)?,
                     categories: Vec::new(),
-                    created_at: row.get(6)?,
-                    updated_at: row.get(7)?,
+                    created_at: row.get(8)?,
+                    updated_at: row.get(9)?,
                 })
             },
         )

@@ -1,9 +1,20 @@
 <script>
+  import { toggleFavorite as toggleFavoriteApi } from "../../utils/api.js";
+
   let { patch, listView = false } = $props();
 
-  function toggleFavorite() {
-    // Will call Tauri command
-    patch.is_favorite = !patch.is_favorite;
+  async function toggleFavorite() {
+    try {
+      const newValue = await toggleFavoriteApi(patch.id);
+      patch.is_favorite = newValue;
+    } catch (e) {
+      console.error("Failed to toggle favorite:", e);
+    }
+  }
+
+  function getCategoryColor(category) {
+    // Use category's color if available, otherwise fallback
+    return category.color || "#6B7280";
   }
 </script>
 
@@ -15,19 +26,27 @@
     >
       {patch.is_favorite ? "★" : "☆"}
     </button>
-    <div class="flex-1">
-      <h3 class="font-medium">{patch.name}</h3>
-      {#if patch.categories?.length}
-        <div class="flex gap-1 mt-1">
+    <div class="flex-1 min-w-0">
+      <h3 class="font-medium truncate">{patch.name}</h3>
+      <div class="flex items-center gap-2 mt-1">
+        {#if patch.library_name}
+          <span class="text-xs px-2 py-0.5 rounded bg-secondary/20 text-secondary">
+            {patch.library_name}
+          </span>
+        {/if}
+        {#if patch.categories?.length}
           {#each patch.categories as category}
-            <span class="text-xs px-2 py-0.5 rounded bg-category-bass/20 text-category-bass">
-              {category}
+            <span
+              class="text-xs px-2 py-0.5 rounded"
+              style="background-color: {getCategoryColor(category)}20; color: {getCategoryColor(category)}"
+            >
+              {category.name}
             </span>
           {/each}
-        </div>
-      {/if}
+        {/if}
+      </div>
     </div>
-    <div class="flex gap-2">
+    <div class="flex gap-2 flex-shrink-0">
       <button class="p-2 hover:bg-surface rounded" title="Edit">
         <span class="text-text-secondary">✏️</span>
       </button>
@@ -48,11 +67,22 @@
       </button>
     </div>
 
+    {#if patch.library_name}
+      <div class="mb-2">
+        <span class="text-xs px-2 py-0.5 rounded bg-secondary/20 text-secondary">
+          {patch.library_name}
+        </span>
+      </div>
+    {/if}
+
     {#if patch.categories?.length}
       <div class="flex flex-wrap gap-1 mb-2">
         {#each patch.categories as category}
-          <span class="text-xs px-2 py-0.5 rounded bg-category-bass/20 text-category-bass">
-            {category}
+          <span
+            class="text-xs px-2 py-0.5 rounded"
+            style="background-color: {getCategoryColor(category)}20; color: {getCategoryColor(category)}"
+          >
+            {category.name}
           </span>
         {/each}
       </div>

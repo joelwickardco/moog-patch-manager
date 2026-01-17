@@ -13,16 +13,25 @@ pub async fn get_all_sequences(
 
     let filter = filter.unwrap_or_default();
     let mut sql = String::from(
-        "SELECT id, name, file_hash, file_size, notes, created_at, updated_at FROM sequences WHERE 1=1"
+        "SELECT s.id, s.library_id, l.name as library_name, s.name, s.file_hash, s.file_size,
+                s.notes, s.created_at, s.updated_at
+         FROM sequences s
+         JOIN libraries l ON s.library_id = l.id
+         WHERE 1=1"
     );
     let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
 
+    if let Some(library_id) = filter.library_id {
+        sql.push_str(" AND s.library_id = ?");
+        params_vec.push(Box::new(library_id));
+    }
+
     if let Some(ref name_contains) = filter.name_contains {
-        sql.push_str(" AND name LIKE ?");
+        sql.push_str(" AND s.name LIKE ?");
         params_vec.push(Box::new(format!("%{}%", name_contains)));
     }
 
-    sql.push_str(" ORDER BY name COLLATE NOCASE");
+    sql.push_str(" ORDER BY s.name COLLATE NOCASE");
 
     let params_refs: Vec<&dyn rusqlite::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
 
@@ -31,13 +40,15 @@ pub async fn get_all_sequences(
         .query_map(params_refs.as_slice(), |row| {
             Ok(SequenceDto {
                 id: row.get(0)?,
-                name: row.get(1)?,
-                file_hash: row.get(2)?,
-                file_size: row.get(3)?,
-                notes: row.get(4)?,
+                library_id: row.get(1)?,
+                library_name: row.get(2)?,
+                name: row.get(3)?,
+                file_hash: row.get(4)?,
+                file_size: row.get(5)?,
+                notes: row.get(6)?,
                 categories: Vec::new(),
-                created_at: row.get(5)?,
-                updated_at: row.get(6)?,
+                created_at: row.get(7)?,
+                updated_at: row.get(8)?,
             })
         })
         .map_err(|e| e.to_string())?;
@@ -66,18 +77,24 @@ pub async fn get_sequence_by_id(state: State<'_, AppState>, id: i64) -> Result<S
 
     let mut seq: SequenceDto = conn
         .query_row(
-            "SELECT id, name, file_hash, file_size, notes, created_at, updated_at FROM sequences WHERE id = ?1",
+            "SELECT s.id, s.library_id, l.name as library_name, s.name, s.file_hash, s.file_size,
+                    s.notes, s.created_at, s.updated_at
+             FROM sequences s
+             JOIN libraries l ON s.library_id = l.id
+             WHERE s.id = ?1",
             params![id],
             |row| {
                 Ok(SequenceDto {
                     id: row.get(0)?,
-                    name: row.get(1)?,
-                    file_hash: row.get(2)?,
-                    file_size: row.get(3)?,
-                    notes: row.get(4)?,
+                    library_id: row.get(1)?,
+                    library_name: row.get(2)?,
+                    name: row.get(3)?,
+                    file_hash: row.get(4)?,
+                    file_size: row.get(5)?,
+                    notes: row.get(6)?,
                     categories: Vec::new(),
-                    created_at: row.get(5)?,
-                    updated_at: row.get(6)?,
+                    created_at: row.get(7)?,
+                    updated_at: row.get(8)?,
                 })
             },
         )

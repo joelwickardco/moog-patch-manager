@@ -32,6 +32,11 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            // Library commands
+            commands::libraries::get_all_libraries,
+            commands::libraries::get_library_by_id,
+            commands::libraries::update_library,
+            commands::libraries::delete_library,
             // Patch commands
             commands::patches::get_all_patches,
             commands::patches::get_patch_by_id,

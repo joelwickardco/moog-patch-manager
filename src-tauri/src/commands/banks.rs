@@ -186,10 +186,12 @@ fn get_bank_patches(
 
     let mut stmt = conn
         .prepare(
-            "SELECT bp.patch_number, p.id, p.name, p.file_hash, p.file_size, p.is_favorite,
+            "SELECT bp.patch_number, p.id, p.library_id, l.name as library_name,
+                    p.name, p.file_hash, p.file_size, p.is_favorite,
                     p.notes, p.created_at, p.updated_at
              FROM bank_patches bp
              LEFT JOIN patches p ON bp.patch_id = p.id
+             LEFT JOIN libraries l ON p.library_id = l.id
              WHERE bp.bank_id = ?1
              ORDER BY bp.patch_number",
         )
@@ -205,14 +207,16 @@ fn get_bank_patches(
                     patch_number,
                     PatchDto {
                         id: row.get(1)?,
-                        name: row.get(2)?,
-                        file_hash: row.get(3)?,
-                        file_size: row.get(4)?,
-                        is_favorite: row.get(5)?,
-                        notes: row.get(6)?,
+                        library_id: row.get(2)?,
+                        library_name: row.get::<_, Option<String>>(3)?.unwrap_or_default(),
+                        name: row.get(4)?,
+                        file_hash: row.get(5)?,
+                        file_size: row.get(6)?,
+                        is_favorite: row.get(7)?,
+                        notes: row.get(8)?,
                         categories: Vec::new(),
-                        created_at: row.get(7)?,
-                        updated_at: row.get(8)?,
+                        created_at: row.get(9)?,
+                        updated_at: row.get(10)?,
                     },
                 )))
             } else {
@@ -241,10 +245,11 @@ fn get_bank_sequences(
 
     let mut stmt = conn
         .prepare(
-            "SELECT bs.sequence_number, s.id, s.name, s.file_hash, s.file_size,
-                    s.notes, s.created_at, s.updated_at
+            "SELECT bs.sequence_number, s.id, s.library_id, l.name as library_name,
+                    s.name, s.file_hash, s.file_size, s.notes, s.created_at, s.updated_at
              FROM bank_sequences bs
              LEFT JOIN sequences s ON bs.sequence_id = s.id
+             LEFT JOIN libraries l ON s.library_id = l.id
              WHERE bs.bank_id = ?1
              ORDER BY bs.sequence_number",
         )
@@ -260,13 +265,15 @@ fn get_bank_sequences(
                     seq_number,
                     SequenceDto {
                         id: row.get(1)?,
-                        name: row.get(2)?,
-                        file_hash: row.get(3)?,
-                        file_size: row.get(4)?,
-                        notes: row.get(5)?,
+                        library_id: row.get(2)?,
+                        library_name: row.get::<_, Option<String>>(3)?.unwrap_or_default(),
+                        name: row.get(4)?,
+                        file_hash: row.get(5)?,
+                        file_size: row.get(6)?,
+                        notes: row.get(7)?,
                         categories: Vec::new(),
-                        created_at: row.get(6)?,
-                        updated_at: row.get(7)?,
+                        created_at: row.get(8)?,
+                        updated_at: row.get(9)?,
                     },
                 )))
             } else {

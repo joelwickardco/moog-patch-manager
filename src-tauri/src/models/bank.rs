@@ -15,6 +15,8 @@ pub struct BankDto {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImportResult {
+    pub library_id: i64,
+    pub library_name: String,
     pub patches_imported: i32,
     pub patches_skipped: i32,
     pub sequences_imported: i32,
@@ -24,9 +26,11 @@ pub struct ImportResult {
     pub warnings: Vec<String>,
 }
 
-impl Default for ImportResult {
-    fn default() -> Self {
+impl ImportResult {
+    pub fn new(library_id: i64, library_name: String) -> Self {
         Self {
+            library_id,
+            library_name,
             patches_imported: 0,
             patches_skipped: 0,
             sequences_imported: 0,
