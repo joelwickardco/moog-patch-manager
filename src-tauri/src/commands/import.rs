@@ -138,13 +138,40 @@ async fn import_from_directory(
     let mut result = ImportResult::new(library_id, unique_name);
     result.warnings = parsed.warnings;
 
-    // Import banks
-    for bank in &parsed.banks {
+    // Create 16 banks for this library
+    for bank_num in 1..=16 {
+        // Check if we have a parsed bank name for this number
+        let bank_name = parsed.banks.iter()
+            .find(|b| b.bank_number == bank_num)
+            .map(|b| b.name.clone())
+            .unwrap_or_else(|| format!("Bank {:02}", bank_num));
+
         conn.execute(
-            "UPDATE banks SET name = ?1, updated_at = CURRENT_TIMESTAMP WHERE bank_number = ?2",
-            params![bank.name, bank.bank_number],
+            "INSERT INTO banks (library_id, bank_number, name) VALUES (?1, ?2, ?3)",
+            params![library_id, bank_num, bank_name],
         )
         .map_err(|e| e.to_string())?;
+
+        let bank_id = conn.last_insert_rowid();
+
+        // Create 16 patch slots for this bank
+        for patch_num in 1..=16 {
+            conn.execute(
+                "INSERT INTO bank_patches (bank_id, patch_number, patch_id) VALUES (?1, ?2, NULL)",
+                params![bank_id, patch_num],
+            )
+            .map_err(|e| e.to_string())?;
+        }
+
+        // Create 16 sequence slots for this bank
+        for seq_num in 1..=16 {
+            conn.execute(
+                "INSERT INTO bank_sequences (bank_id, sequence_number, sequence_id) VALUES (?1, ?2, NULL)",
+                params![bank_id, seq_num],
+            )
+            .map_err(|e| e.to_string())?;
+        }
+
         result.banks_imported += 1;
     }
 
@@ -175,11 +202,11 @@ async fn import_from_directory(
             conn.last_insert_rowid()
         };
 
-        // Link to bank
+        // Link to bank (using library_id to find the correct bank)
         let bank_id: i64 = conn
             .query_row(
-                "SELECT id FROM banks WHERE bank_number = ?1",
-                params![patch.bank_number],
+                "SELECT id FROM banks WHERE library_id = ?1 AND bank_number = ?2",
+                params![library_id, patch.bank_number],
                 |row| row.get(0),
             )
             .map_err(|e| e.to_string())?;
@@ -218,11 +245,11 @@ async fn import_from_directory(
             conn.last_insert_rowid()
         };
 
-        // Link to bank
+        // Link to bank (using library_id to find the correct bank)
         let bank_id: i64 = conn
             .query_row(
-                "SELECT id FROM banks WHERE bank_number = ?1",
-                params![seq.bank_number],
+                "SELECT id FROM banks WHERE library_id = ?1 AND bank_number = ?2",
+                params![library_id, seq.bank_number],
                 |row| row.get(0),
             )
             .map_err(|e| e.to_string())?;

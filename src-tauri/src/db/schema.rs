@@ -68,15 +68,17 @@ CREATE TABLE IF NOT EXISTS sequence_categories (
     FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
 );
 
--- Bank configurations (logical groupings for export)
+-- Banks within a library (each library has exactly 16 banks)
 CREATE TABLE IF NOT EXISTS banks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    library_id INTEGER NOT NULL,
     bank_number INTEGER NOT NULL,
     name TEXT NOT NULL,
     description TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (bank_number)
+    FOREIGN KEY (library_id) REFERENCES libraries(id) ON DELETE CASCADE,
+    UNIQUE (library_id, bank_number)
 );
 
 -- Bank slots: which patches go in which positions
@@ -113,5 +115,6 @@ CREATE INDEX IF NOT EXISTS idx_sequences_hash ON sequences(file_hash);
 CREATE INDEX IF NOT EXISTS idx_patch_categories_patch ON patch_categories(patch_id);
 CREATE INDEX IF NOT EXISTS idx_patch_categories_category ON patch_categories(category_id);
 CREATE INDEX IF NOT EXISTS idx_sequence_categories_sequence ON sequence_categories(sequence_id);
-CREATE INDEX IF NOT EXISTS idx_banks_number ON banks(bank_number);
+CREATE INDEX IF NOT EXISTS idx_banks_library ON banks(library_id);
+CREATE INDEX IF NOT EXISTS idx_banks_number ON banks(library_id, bank_number);
 "#;

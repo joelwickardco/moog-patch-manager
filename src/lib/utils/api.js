@@ -97,28 +97,28 @@ export async function removeSequenceFromCategory(sequenceId, categoryId) {
 }
 
 // Bank operations
-export async function getAllBanks() {
-  return invoke("get_all_banks");
+export async function getBanksForLibrary(libraryId) {
+  return invoke("get_banks_for_library", { libraryId });
 }
 
-export async function getBankByNumber(bankNumber) {
-  return invoke("get_bank_by_number", { bankNumber });
+export async function getBankByNumber(libraryId, bankNumber) {
+  return invoke("get_bank_by_number", { libraryId, bankNumber });
 }
 
-export async function updateBankName(bankNumber, name) {
-  return invoke("update_bank_name", { bankNumber, name });
+export async function updateBankName(libraryId, bankNumber, name) {
+  return invoke("update_bank_name", { libraryId, bankNumber, name });
 }
 
-export async function assignPatchToBank(bankNumber, patchNumber, patchId = null) {
-  return invoke("assign_patch_to_bank", { bankNumber, patchNumber, patchId });
+export async function assignPatchToBank(libraryId, bankNumber, patchNumber, patchId = null) {
+  return invoke("assign_patch_to_bank", { libraryId, bankNumber, patchNumber, patchId });
 }
 
-export async function assignSequenceToBank(bankNumber, sequenceNumber, sequenceId = null) {
-  return invoke("assign_sequence_to_bank", { bankNumber, sequenceNumber, sequenceId });
+export async function assignSequenceToBank(libraryId, bankNumber, sequenceNumber, sequenceId = null) {
+  return invoke("assign_sequence_to_bank", { libraryId, bankNumber, sequenceNumber, sequenceId });
 }
 
-export async function clearBankSlot(bankNumber, patchNumber) {
-  return invoke("clear_bank_slot", { bankNumber, patchNumber });
+export async function clearBankSlot(libraryId, bankNumber, patchNumber) {
+  return invoke("clear_bank_slot", { libraryId, bankNumber, patchNumber });
 }
 
 // Import operations
@@ -135,10 +135,10 @@ export async function validateLibraryStructure(path) {
 }
 
 // Export operations
-export async function exportLibrary(outputPath) {
-  return invoke("export_library", { outputPath });
+export async function exportLibrary(libraryId, outputPath) {
+  return invoke("export_library", { libraryId, outputPath });
 }
 
-export async function previewExport() {
-  return invoke("preview_export");
+export async function previewExport(libraryId) {
+  return invoke("preview_export", { libraryId });
 }

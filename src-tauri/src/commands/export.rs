@@ -9,10 +9,20 @@ use crate::AppState;
 #[tauri::command]
 pub async fn export_library(
     state: State<'_, AppState>,
+    library_id: i64,
     output_path: String,
 ) -> Result<ExportResult, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
     let conn = db.conn();
+
+    // Get library name
+    let library_name: String = conn
+        .query_row(
+            "SELECT name FROM libraries WHERE id = ?1",
+            params![library_id],
+            |row| row.get(0),
+        )
+        .map_err(|e| format!("Library not found: {}", e))?;
 
     // Create temp directory for building structure
     let temp_dir = std::env::temp_dir().join(format!("moog_export_{}", std::process::id()));
@@ -23,12 +33,12 @@ pub async fn export_library(
     let mut sequences_exported = 0;
     let mut empty_slots = 0;
 
-    // Build export banks
+    // Build export banks for this library
     for bank_num in 1..=16 {
         let (bank_id, bank_name): (i64, String) = conn
             .query_row(
-                "SELECT id, name FROM banks WHERE bank_number = ?1",
-                params![bank_num],
+                "SELECT id, name FROM banks WHERE library_id = ?1 AND bank_number = ?2",
+                params![library_id, bank_num],
                 |row| Ok((row.get(0)?, row.get(1)?)),
             )
             .map_err(|e| e.to_string())?;
@@ -130,6 +140,8 @@ pub async fn export_library(
     let _ = std::fs::remove_dir_all(&temp_dir);
 
     Ok(ExportResult {
+        library_id,
+        library_name,
         output_path,
         file_size,
         banks_exported: 16,
@@ -140,22 +152,40 @@ pub async fn export_library(
 }
 
 #[tauri::command]
-pub async fn preview_export(state: State<'_, AppState>) -> Result<ExportPreview, String> {
+pub async fn preview_export(
+    state: State<'_, AppState>,
+    library_id: i64,
+) -> Result<ExportPreview, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
     let conn = db.conn();
 
+    // Get library name
+    let library_name: String = conn
+        .query_row(
+            "SELECT name FROM libraries WHERE id = ?1",
+            params![library_id],
+            |row| row.get(0),
+        )
+        .map_err(|e| format!("Library not found: {}", e))?;
+
+    // Count patches in bank_patches for this library's banks
     let total_patches: i32 = conn
         .query_row(
-            "SELECT COUNT(*) FROM bank_patches WHERE patch_id IS NOT NULL",
-            [],
+            "SELECT COUNT(*) FROM bank_patches bp
+             JOIN banks b ON bp.bank_id = b.id
+             WHERE b.library_id = ?1 AND bp.patch_id IS NOT NULL",
+            params![library_id],
             |row| row.get(0),
         )
         .map_err(|e| e.to_string())?;
 
+    // Count sequences in bank_sequences for this library's banks
     let total_sequences: i32 = conn
         .query_row(
-            "SELECT COUNT(*) FROM bank_sequences WHERE sequence_id IS NOT NULL",
-            [],
+            "SELECT COUNT(*) FROM bank_sequences bs
+             JOIN banks b ON bs.bank_id = b.id
+             WHERE b.library_id = ?1 AND bs.sequence_id IS NOT NULL",
+            params![library_id],
             |row| row.get(0),
         )
         .map_err(|e| e.to_string())?;
@@ -163,24 +193,32 @@ pub async fn preview_export(state: State<'_, AppState>) -> Result<ExportPreview,
     let empty_patch_slots = (16 * 16) - total_patches;
     let empty_sequence_slots = (16 * 16) - total_sequences;
 
-    // Estimate size: sum of all patch and sequence file sizes
+    // Estimate size: sum of all patch and sequence file sizes for this library
     let estimated_size: i64 = conn
         .query_row(
-            "SELECT COALESCE(SUM(file_size), 0) FROM patches WHERE id IN (SELECT patch_id FROM bank_patches WHERE patch_id IS NOT NULL)",
-            [],
+            "SELECT COALESCE(SUM(p.file_size), 0) FROM patches p
+             JOIN bank_patches bp ON p.id = bp.patch_id
+             JOIN banks b ON bp.bank_id = b.id
+             WHERE b.library_id = ?1",
+            params![library_id],
             |row| row.get(0),
         )
         .map_err(|e| e.to_string())?;
 
     let seq_size: i64 = conn
         .query_row(
-            "SELECT COALESCE(SUM(file_size), 0) FROM sequences WHERE id IN (SELECT sequence_id FROM bank_sequences WHERE sequence_id IS NOT NULL)",
-            [],
+            "SELECT COALESCE(SUM(s.file_size), 0) FROM sequences s
+             JOIN bank_sequences bs ON s.id = bs.sequence_id
+             JOIN banks b ON bs.bank_id = b.id
+             WHERE b.library_id = ?1",
+            params![library_id],
             |row| row.get(0),
         )
         .map_err(|e| e.to_string())?;
 
     Ok(ExportPreview {
+        library_id,
+        library_name,
         total_banks: 16,
         total_patches,
         total_sequences,

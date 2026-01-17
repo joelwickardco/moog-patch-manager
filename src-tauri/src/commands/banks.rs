@@ -4,7 +4,10 @@ use crate::models::{BankDto, PatchDto, SequenceDto};
 use crate::AppState;
 
 #[tauri::command]
-pub async fn get_all_banks(state: State<'_, AppState>) -> Result<Vec<BankDto>, String> {
+pub async fn get_banks_for_library(
+    state: State<'_, AppState>,
+    library_id: i64,
+) -> Result<Vec<BankDto>, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
     let conn = db.conn();
 
@@ -12,26 +15,27 @@ pub async fn get_all_banks(state: State<'_, AppState>) -> Result<Vec<BankDto>, S
 
     let mut stmt = conn
         .prepare(
-            "SELECT id, bank_number, name, description, created_at, updated_at
-             FROM banks ORDER BY bank_number",
+            "SELECT id, library_id, bank_number, name, description, created_at, updated_at
+             FROM banks WHERE library_id = ?1 ORDER BY bank_number",
         )
         .map_err(|e| e.to_string())?;
 
     let bank_rows = stmt
-        .query_map([], |row| {
+        .query_map(params![library_id], |row| {
             Ok((
                 row.get::<_, i64>(0)?,
-                row.get::<_, i32>(1)?,
-                row.get::<_, String>(2)?,
-                row.get::<_, Option<String>>(3)?,
-                row.get::<_, String>(4)?,
+                row.get::<_, i64>(1)?,
+                row.get::<_, i32>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, Option<String>>(4)?,
                 row.get::<_, String>(5)?,
+                row.get::<_, String>(6)?,
             ))
         })
         .map_err(|e| e.to_string())?;
 
     for bank_result in bank_rows {
-        let (id, bank_number, name, description, created_at, updated_at) =
+        let (id, lib_id, bank_number, name, description, created_at, updated_at) =
             bank_result.map_err(|e| e.to_string())?;
 
         let patches = get_bank_patches(conn, id)?;
@@ -39,6 +43,7 @@ pub async fn get_all_banks(state: State<'_, AppState>) -> Result<Vec<BankDto>, S
 
         banks.push(BankDto {
             id,
+            library_id: lib_id,
             bank_number,
             name,
             description,
@@ -55,6 +60,7 @@ pub async fn get_all_banks(state: State<'_, AppState>) -> Result<Vec<BankDto>, S
 #[tauri::command]
 pub async fn get_bank_by_number(
     state: State<'_, AppState>,
+    library_id: i64,
     bank_number: i32,
 ) -> Result<BankDto, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
@@ -62,8 +68,9 @@ pub async fn get_bank_by_number(
 
     let (id, name, description, created_at, updated_at): (i64, String, Option<String>, String, String) =
         conn.query_row(
-            "SELECT id, name, description, created_at, updated_at FROM banks WHERE bank_number = ?1",
-            params![bank_number],
+            "SELECT id, name, description, created_at, updated_at
+             FROM banks WHERE library_id = ?1 AND bank_number = ?2",
+            params![library_id, bank_number],
             |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
         )
         .map_err(|e| e.to_string())?;
@@ -73,6 +80,7 @@ pub async fn get_bank_by_number(
 
     Ok(BankDto {
         id,
+        library_id,
         bank_number,
         name,
         description,
@@ -86,6 +94,7 @@ pub async fn get_bank_by_number(
 #[tauri::command]
 pub async fn update_bank_name(
     state: State<'_, AppState>,
+    library_id: i64,
     bank_number: i32,
     name: String,
 ) -> Result<(), String> {
@@ -93,8 +102,9 @@ pub async fn update_bank_name(
     let conn = db.conn();
 
     conn.execute(
-        "UPDATE banks SET name = ?1, updated_at = CURRENT_TIMESTAMP WHERE bank_number = ?2",
-        params![name, bank_number],
+        "UPDATE banks SET name = ?1, updated_at = CURRENT_TIMESTAMP
+         WHERE library_id = ?2 AND bank_number = ?3",
+        params![name, library_id, bank_number],
     )
     .map_err(|e| e.to_string())?;
 
@@ -104,6 +114,7 @@ pub async fn update_bank_name(
 #[tauri::command]
 pub async fn assign_patch_to_bank(
     state: State<'_, AppState>,
+    library_id: i64,
     bank_number: i32,
     patch_number: i32,
     patch_id: Option<i64>,
@@ -113,8 +124,8 @@ pub async fn assign_patch_to_bank(
 
     let bank_id: i64 = conn
         .query_row(
-            "SELECT id FROM banks WHERE bank_number = ?1",
-            params![bank_number],
+            "SELECT id FROM banks WHERE library_id = ?1 AND bank_number = ?2",
+            params![library_id, bank_number],
             |row| row.get(0),
         )
         .map_err(|e| e.to_string())?;
@@ -138,6 +149,7 @@ pub async fn assign_patch_to_bank(
 #[tauri::command]
 pub async fn assign_sequence_to_bank(
     state: State<'_, AppState>,
+    library_id: i64,
     bank_number: i32,
     sequence_number: i32,
     sequence_id: Option<i64>,
@@ -147,8 +159,8 @@ pub async fn assign_sequence_to_bank(
 
     let bank_id: i64 = conn
         .query_row(
-            "SELECT id FROM banks WHERE bank_number = ?1",
-            params![bank_number],
+            "SELECT id FROM banks WHERE library_id = ?1 AND bank_number = ?2",
+            params![library_id, bank_number],
             |row| row.get(0),
         )
         .map_err(|e| e.to_string())?;
@@ -172,10 +184,11 @@ pub async fn assign_sequence_to_bank(
 #[tauri::command]
 pub async fn clear_bank_slot(
     state: State<'_, AppState>,
+    library_id: i64,
     bank_number: i32,
     patch_number: i32,
 ) -> Result<(), String> {
-    assign_patch_to_bank(state, bank_number, patch_number, None).await
+    assign_patch_to_bank(state, library_id, bank_number, patch_number, None).await
 }
 
 fn get_bank_patches(

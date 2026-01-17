@@ -60,7 +60,7 @@ pub fn run() {
             commands::categories::assign_sequence_to_category,
             commands::categories::remove_sequence_from_category,
             // Bank commands
-            commands::banks::get_all_banks,
+            commands::banks::get_banks_for_library,
             commands::banks::get_bank_by_number,
             commands::banks::update_bank_name,
             commands::banks::assign_patch_to_bank,
