@@ -1,7 +1,7 @@
 # Moog Muse Patch Manager - Application Specification
 
-**Version:** 1.0  
-**Last Updated:** January 2026  
+**Version:** 1.1
+**Last Updated:** January 17, 2026  
 **Target Platforms:** macOS (primary), Linux (secondary)
 
 ---
@@ -11,12 +11,13 @@
 The Moog Muse Patch Manager is a desktop application for organizing, categorizing, and managing sound patches and sequences for the Moog Muse synthesizer. The application provides a local database for patch management with features including favorites, user-defined categories, and custom bank organization - capabilities not available in the synthesizer's native filesystem-based organization.
 
 ### Key Features
-- Import patches/sequences from Moog library archives (.zip) or bank directories
+- **Multi-library management:** Import multiple patch libraries from different sources (Moog factory, third-party sound designers, user-created)
+- **Automatic library naming:** ZIP filename becomes the library name on import (e.g., `Moog Factory Sounds v2.zip` → "Moog Factory Sounds v2")
 - Organize patches with user-defined categories and favorites
-- Search and filter patch library
-- Build custom bank configurations (16 banks × 16 patches)
+- Search and filter across all libraries or within specific libraries
+- Build custom bank configurations (16 banks × 16 patches) by mixing patches from any library
 - Export complete library structure for transfer to synthesizer
-- Duplicate detection via file hashing
+- Duplicate detection via file hashing (across all libraries)
 - Metadata management (notes, tags, categories)
 
 ### Design Goals
@@ -116,9 +117,24 @@ walkdir = "2.4"
 ### 4.1 Database Schema
 
 ```sql
+-- Source libraries (imported ZIP archives)
+-- Each ZIP file import creates a new library entry
+CREATE TABLE libraries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,            -- Derived from ZIP filename (without .zip extension)
+    description TEXT,                     -- Optional user description
+    source_filename TEXT,                 -- Original ZIP filename for reference
+    color TEXT,                           -- Hex color for UI identification (#FF5733)
+    patch_count INTEGER DEFAULT 0,        -- Cached count for performance
+    sequence_count INTEGER DEFAULT 0,     -- Cached count for performance
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Core patch storage
 CREATE TABLE patches (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    library_id INTEGER NOT NULL,          -- Which library this patch came from
     name TEXT NOT NULL,
     file_data BLOB NOT NULL,              -- .mmp file contents
     file_hash TEXT NOT NULL UNIQUE,       -- SHA-256 for duplicate detection
@@ -126,19 +142,22 @@ CREATE TABLE patches (
     is_favorite BOOLEAN DEFAULT 0,
     notes TEXT,                           -- User notes
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (library_id) REFERENCES libraries(id) ON DELETE CASCADE
 );
 
 -- Sequence storage (independent of patches)
 CREATE TABLE sequences (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    library_id INTEGER NOT NULL,          -- Which library this sequence came from
     name TEXT NOT NULL,
     file_data BLOB NOT NULL,              -- .mmseq file contents
     file_hash TEXT NOT NULL UNIQUE,       -- SHA-256 for duplicate detection
     file_size INTEGER NOT NULL,
     notes TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (library_id) REFERENCES libraries(id) ON DELETE CASCADE
 );
 
 -- User-defined categories (app-only, not in Moog)
@@ -202,9 +221,12 @@ CREATE TABLE bank_sequences (
 );
 
 -- Indexes for performance
+CREATE INDEX idx_libraries_name ON libraries(name COLLATE NOCASE);
+CREATE INDEX idx_patches_library ON patches(library_id);
 CREATE INDEX idx_patches_favorite ON patches(is_favorite);
 CREATE INDEX idx_patches_name ON patches(name COLLATE NOCASE);
 CREATE INDEX idx_patches_hash ON patches(file_hash);
+CREATE INDEX idx_sequences_library ON sequences(library_id);
 CREATE INDEX idx_sequences_name ON sequences(name COLLATE NOCASE);
 CREATE INDEX idx_sequences_hash ON sequences(file_hash);
 CREATE INDEX idx_patch_categories_patch ON patch_categories(patch_id);
@@ -216,6 +238,9 @@ CREATE INDEX idx_banks_number ON banks(bank_number);
 ### 4.2 Data Relationships
 
 ```
+libraries (1) ←→ (N) patches
+libraries (1) ←→ (N) sequences
+
 patches (1) ←→ (N) patch_categories (N) ←→ (1) categories
 sequences (1) ←→ (N) sequence_categories (N) ←→ (1) categories
 
@@ -223,15 +248,39 @@ banks (1) ←→ (N) bank_patches (N) ←→ (0..1) patches
 banks (1) ←→ (N) bank_sequences (N) ←→ (0..1) sequences
 ```
 
+**Hierarchy:**
+```
+Libraries (source collections)
+├── "Moog Factory Sounds v2"
+│   ├── 256 patches (16 banks × 16)
+│   └── 256 sequences
+├── "Sound Designer Pack - Bass"
+│   ├── 48 patches
+│   └── 16 sequences
+└── "My Custom Patches"
+    └── 12 patches
+
+Banks (user-organized for export)
+├── Bank 01: "Live Performance"
+│   ├── Patch from "Moog Factory"
+│   ├── Patch from "Bass Pack"
+│   └── ...
+└── Bank 02: "Studio Session"
+    └── ...
+```
+
 ### 4.3 Key Constraints
 
-- Patches identified by SHA-256 hash (no duplicates by content)
+- **Library names must be unique** (derived from ZIP filename, user can rename)
+- Patches identified by SHA-256 hash (no duplicates by content across ALL libraries)
 - Sequences identified by SHA-256 hash (no duplicates by content)
+- Each patch/sequence belongs to exactly one source library
 - Bank numbers 1-16 (enforced by application logic)
 - Patch numbers 1-16 per bank
 - Sequence numbers 1-16 per bank
 - Category names must be unique
 - Bank names are user-defined but exported as `<name>.bank` files
+- Banks can contain patches from ANY library (mix and match)
 
 ---
 
@@ -269,6 +318,7 @@ async fn search_patches(query: String) -> Result<Vec<PatchDto>, String>
 **PatchFilter Structure:**
 ```rust
 struct PatchFilter {
+    library_id: Option<i64>,              // Filter by source library
     is_favorite: Option<bool>,
     category_ids: Option<Vec<i64>>,
     name_contains: Option<String>,
@@ -279,6 +329,8 @@ struct PatchFilter {
 ```rust
 struct PatchDto {
     id: i64,
+    library_id: i64,
+    library_name: String,                 // Denormalized for display
     name: String,
     file_hash: String,
     file_size: i64,
@@ -314,7 +366,82 @@ async fn delete_sequence(sequence_id: i64) -> Result<(), String>
 async fn search_sequences(query: String) -> Result<Vec<SequenceDto>, String>
 ```
 
-### 5.3 Category Management
+**SequenceFilter Structure:**
+```rust
+struct SequenceFilter {
+    library_id: Option<i64>,              // Filter by source library
+    category_ids: Option<Vec<i64>>,
+    name_contains: Option<String>,
+}
+```
+
+**SequenceDto Structure:**
+```rust
+struct SequenceDto {
+    id: i64,
+    library_id: i64,
+    library_name: String,                 // Denormalized for display
+    name: String,
+    file_hash: String,
+    file_size: i64,
+    notes: Option<String>,
+    categories: Vec<CategoryDto>,
+    created_at: String,
+    updated_at: String,
+}
+```
+
+### 5.3 Library Management
+
+```rust
+#[tauri::command]
+async fn get_all_libraries() -> Result<Vec<LibraryDto>, String>
+
+#[tauri::command]
+async fn get_library_by_id(id: i64) -> Result<LibraryDto, String>
+
+#[tauri::command]
+async fn update_library(
+    id: i64,
+    name: Option<String>,
+    description: Option<String>,
+    color: Option<String>
+) -> Result<LibraryDto, String>
+
+#[tauri::command]
+async fn delete_library(id: i64) -> Result<(), String>
+
+#[tauri::command]
+async fn get_library_statistics(id: i64) -> Result<LibraryStats, String>
+```
+
+**LibraryDto Structure:**
+```rust
+struct LibraryDto {
+    id: i64,
+    name: String,
+    description: Option<String>,
+    source_filename: String,
+    color: Option<String>,
+    patch_count: i64,
+    sequence_count: i64,
+    created_at: String,
+    updated_at: String,
+}
+```
+
+**LibraryStats Structure:**
+```rust
+struct LibraryStats {
+    total_patches: i64,
+    total_sequences: i64,
+    total_size_bytes: i64,
+    categories_used: Vec<CategoryDto>,
+    favorited_patches: i64,
+}
+```
+
+### 5.4 Category Management
 
 ```rust
 #[tauri::command]
@@ -448,8 +575,10 @@ async fn validate_library_structure(
 **ImportResult Structure:**
 ```rust
 struct ImportResult {
+    library_id: i64,                  // ID of created library
+    library_name: String,             // Name derived from ZIP filename
     patches_imported: i32,
-    patches_skipped: i32,  // Duplicates by hash
+    patches_skipped: i32,             // Duplicates by hash (across all libraries)
     sequences_imported: i32,
     sequences_skipped: i32,
     banks_imported: i32,
@@ -511,31 +640,67 @@ struct ExportPreview {
 ### 6.1 Application Layout
 
 ```
-┌─────────────────────────────────────────────────────┐
-│  Moog Muse Patch Manager            [? Help] [⚙️]   │
-├─────────────────────────────────────────────────────┤
-│  📁 Library  |  🏦 Banks  |  🏷️ Categories          │
-├──────────┬──────────────────────────────────────────┤
-│          │  🔍 Search: [__________]  ⭐ ❤️ 🎨       │
-│ Sidebar  │                                          │
-│          │  ┌──────────────────────────────────┐   │
-│ ☆ Fav    │  │  Patch Card                      │   │
-│ 📂 All   │  │  Name: Deep Bass                 │   │
-│          │  │  Categories: Bass, Dark          │   │
-│ Cat:     │  │  [⭐] [❤️] [✏️] [🗑️]             │   │
-│  Bass    │  └──────────────────────────────────┘   │
-│  Lead    │                                          │
-│  Pad     │  [Similar cards in grid layout...]      │
-│  ...     │                                          │
-│          │                                          │
-│ [Import] │                                          │
-│ [Export] │                                          │
-└──────────┴──────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│  Moog Muse Patch Manager                        [? Help] [⚙️]    │
+├──────────────────────────────────────────────────────────────────┤
+│  📚 Libraries  |  🏦 Banks  |  🏷️ Categories                     │
+├────────────────┬─────────────────────────────────────────────────┤
+│                │  🔍 Search: [__________]  ⭐ ❤️ 🎨 [Library: All]│
+│  LIBRARIES     │                                                  │
+│  ────────────  │  ┌──────────────────────────────────┐           │
+│  📂 All        │  │  Patch Card                      │           │
+│  ├─ 🔴 Moog    │  │  Name: Deep Bass                 │           │
+│  │  Factory    │  │  Library: Moog Factory v2        │           │
+│  ├─ 🟢 Bass    │  │  Categories: Bass, Dark          │           │
+│  │  Pack       │  │  [⭐] [❤️] [✏️] [🗑️]             │           │
+│  └─ 🔵 My      │  └──────────────────────────────────┘           │
+│     Patches    │                                                  │
+│                │  [Similar cards in grid layout...]              │
+│  FILTERS       │                                                  │
+│  ────────────  │                                                  │
+│  ☆ Favorites   │                                                  │
+│                │                                                  │
+│  CATEGORIES    │                                                  │
+│  ────────────  │                                                  │
+│  🏷️ Bass       │                                                  │
+│  🏷️ Lead       │                                                  │
+│  🏷️ Pad        │                                                  │
+│                │                                                  │
+│  [+ Import]    │                                                  │
+│  [↗ Export]    │                                                  │
+└────────────────┴─────────────────────────────────────────────────┘
 ```
+
+**Sidebar Hierarchy:**
+- **Libraries section** shows all imported libraries with color indicators
+- Clicking a library filters to show only patches/sequences from that source
+- "All" shows patches from all libraries combined
+- Each library displays its name (derived from ZIP filename) and colored dot
+- Libraries can be renamed by the user after import
 
 ### 6.2 Core Components
 
-#### 6.2.1 PatchList Component
+#### 6.2.1 LibrarySidebar Component
+**Purpose:** Display all imported libraries for filtering
+
+**Props:**
+- `libraries: LibraryDto[]`
+- `selectedLibraryId: number | null`
+
+**Features:**
+- List all imported libraries with color indicators
+- "All Libraries" option to show all patches
+- Click to filter patches by library
+- Library patch/sequence count display
+- Context menu: Rename, Change Color, Delete
+
+**State:**
+```javascript
+let libraries = [];
+let selectedLibraryId = null; // null = "All"
+```
+
+#### 6.2.2 PatchList Component
 **Purpose:** Display all patches with filtering and search
 
 **Props:**
@@ -554,7 +719,7 @@ let selectedPatches = [];
 let viewMode = 'grid'; // or 'list'
 ```
 
-#### 6.2.2 PatchCard Component
+#### 6.2.3 PatchCard Component
 **Purpose:** Display individual patch with metadata
 
 **Props:**
@@ -567,7 +732,7 @@ let viewMode = 'grid'; // or 'list'
 - Quick actions menu
 - Notes display (expandable)
 
-#### 6.2.3 BankBuilder Component (Phase 2+)
+#### 6.2.4 BankBuilder Component (Phase 2+)
 **Purpose:** Visual 16-slot grid for building banks
 
 **Features:**
@@ -589,7 +754,7 @@ Bank 03: "My Favorites"
 ... (continues to 16)
 ```
 
-#### 6.2.4 CategoryManager Component
+#### 6.2.5 CategoryManager Component
 **Purpose:** CRUD operations for categories
 
 **Features:**
@@ -598,7 +763,7 @@ Bank 03: "My Favorites"
 - Delete with confirmation
 - View patches per category
 
-#### 6.2.5 ImportDialog Component
+#### 6.2.6 ImportDialog Component
 **Purpose:** Guide user through import process
 
 **Steps:**
@@ -608,7 +773,7 @@ Bank 03: "My Favorites"
 4. Confirm and execute
 5. Show results
 
-#### 6.2.6 ExportDialog Component
+#### 6.2.7 ExportDialog Component
 **Purpose:** Configure and execute export
 
 **Steps:**
@@ -620,29 +785,48 @@ Bank 03: "My Favorites"
 
 ### 6.3 User Workflows
 
-#### Workflow 1: Import Patches
+#### Workflow 1: Import Library
 ```
 User Action → System Response
 ──────────────────────────────────────────────
 1. Click "Import" button
-   → Open file/folder picker dialog
-   
-2. Select library.zip or bankXX/ folder
-   → Validate structure in background
-   → Show validation results
-   
-3. Review preview (duplicates highlighted)
-   → Display ImportPreview component
-   
+   → Open file picker dialog (accepts .zip files)
+
+2. Select library.zip file
+   → Extract library name from filename:
+     "Moog Factory Sounds v2.zip" → "Moog Factory Sounds v2"
+     "Bass_Pack_2024.zip" → "Bass_Pack_2024"
+   → Validate internal structure (bankXX/ folders)
+   → Show validation results with library name preview
+
+3. Review import preview
+   → Display ImportPreview component showing:
+     - Proposed library name (editable)
+     - Number of patches found
+     - Number of sequences found
+     - Duplicates highlighted (by hash across ALL libraries)
+     - Library color picker (optional)
+
 4. Confirm import
+   → Create new library entry in database
    → Show progress indicator
-   → Import files, calculate hashes
-   → Store in database
-   
+   → Import all patches/sequences with library_id reference
+   → Calculate hashes for duplicate detection
+
 5. View results
-   → Show ImportResult summary
-   → Navigate to imported patches
+   → Show ImportResult summary:
+     - Library: "Moog Factory Sounds v2" created
+     - Patches imported: 128
+     - Sequences imported: 64
+     - Duplicates skipped: 3
+   → Navigate to newly imported library in sidebar
 ```
+
+**Library Name Rules:**
+- File extension (.zip) is stripped
+- Name must be unique; duplicates prompt user to rename
+- User can edit the name during import preview
+- Original filename stored in `source_filename` for reference
 
 #### Workflow 2: Organize Patches
 ```
@@ -747,6 +931,7 @@ moog-muse-manager/
 │   │   ├── main.rs                 # App entry point
 │   │   ├── commands/               # Tauri command handlers
 │   │   │   ├── mod.rs
+│   │   │   ├── libraries.rs        # Library CRUD operations
 │   │   │   ├── patches.rs
 │   │   │   ├── sequences.rs
 │   │   │   ├── categories.rs
@@ -760,6 +945,7 @@ moog-muse-manager/
 │   │   │   └── migrations.rs
 │   │   ├── models/                 # Data structures
 │   │   │   ├── mod.rs
+│   │   │   ├── library.rs          # Library model and DTOs
 │   │   │   ├── patch.rs
 │   │   │   ├── sequence.rs
 │   │   │   ├── category.rs
@@ -780,6 +966,10 @@ moog-muse-manager/
 ├── src/                            # Svelte frontend
 │   ├── lib/
 │   │   ├── components/
+│   │   │   ├── libraries/
+│   │   │   │   ├── LibrarySidebar.svelte
+│   │   │   │   ├── LibraryCard.svelte
+│   │   │   │   └── LibraryColorPicker.svelte
 │   │   │   ├── patches/
 │   │   │   │   ├── PatchList.svelte
 │   │   │   │   ├── PatchCard.svelte
@@ -808,6 +998,7 @@ moog-muse-manager/
 │   │   │       ├── SearchBar.svelte
 │   │   │       └── Sidebar.svelte
 │   │   ├── stores/
+│   │   │   ├── libraries.js        # Library state and selection
 │   │   │   ├── patches.js          # Patch state management
 │   │   │   ├── sequences.js
 │   │   │   ├── categories.js
@@ -1292,6 +1483,7 @@ jobs:
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0 | 2026-01-12 | Initial | Complete application specification |
+| 1.1 | 2026-01-17 | Update | Added multi-library support: libraries table, library filtering, import workflow with ZIP filename as library name |
 
 ---
 
