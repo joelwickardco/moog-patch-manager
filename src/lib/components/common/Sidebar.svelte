@@ -4,7 +4,9 @@
     libraries = [],
     selectedLibraryId = $bindable(),
     onImport = () => {},
-    importing = false
+    importing = false,
+    onExport = () => {},
+    exporting = false
   } = $props();
 
   const tabs = [
@@ -96,8 +98,13 @@
     >
       {importing ? "Importing..." : "Import"}
     </button>
-    <button class="w-full px-4 py-2 bg-secondary text-white rounded-lg hover:bg-secondary/90 transition-colors">
-      Export
+    <button
+      class="w-full px-4 py-2 bg-secondary text-white rounded-lg hover:bg-secondary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      onclick={onExport}
+      disabled={exporting || selectedLibraryId === null}
+      title={selectedLibraryId === null ? "Select a library to export" : "Export selected library"}
+    >
+      {exporting ? "Exporting..." : "Export"}
     </button>
   </div>
 </aside>

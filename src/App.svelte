@@ -1,14 +1,15 @@
 <script>
-  import { open } from "@tauri-apps/plugin-dialog";
+  import { open, save } from "@tauri-apps/plugin-dialog";
   import Sidebar from "./lib/components/common/Sidebar.svelte";
   import PatchList from "./lib/components/patches/PatchList.svelte";
-  import { getAllLibraries, importLibraryZip } from "./lib/utils/api.js";
+  import { getAllLibraries, importLibraryZip, exportLibrary } from "./lib/utils/api.js";
 
   let activeTab = $state("library");
   let libraries = $state([]);
   let selectedLibraryId = $state(null);
   let importing = $state(false);
-  let importMessage = $state(null);
+  let exporting = $state(false);
+  let statusMessage = $state(null);
 
   async function loadLibraries() {
     try {
@@ -40,13 +41,13 @@
       }
 
       importing = true;
-      importMessage = null;
+      statusMessage = null;
 
       // Import the library
       const result = await importLibraryZip(selected);
 
       // Show success message
-      importMessage = {
+      statusMessage = {
         type: "success",
         text: `Imported "${result.library_name}": ${result.patches_imported} patches, ${result.sequences_imported} sequences`
       };
@@ -60,7 +61,7 @@
 
     } catch (e) {
       console.error("Import failed:", e);
-      importMessage = {
+      statusMessage = {
         type: "error",
         text: `Import failed: ${e}`
       };
@@ -69,7 +70,63 @@
 
       // Clear message after 5 seconds
       setTimeout(() => {
-        importMessage = null;
+        statusMessage = null;
+      }, 5000);
+    }
+  }
+
+  async function handleExport() {
+    if (!selectedLibraryId) {
+      statusMessage = {
+        type: "error",
+        text: "Please select a library to export"
+      };
+      return;
+    }
+
+    // Get the library name for the default filename
+    const library = libraries.find(l => l.id === selectedLibraryId);
+    const defaultFilename = library ? `${library.name}.zip` : "library.zip";
+
+    try {
+      // Open save dialog for ZIP file location
+      const outputPath = await save({
+        defaultPath: defaultFilename,
+        filters: [{
+          name: "ZIP Archives",
+          extensions: ["zip"]
+        }]
+      });
+
+      if (!outputPath) {
+        // User cancelled
+        return;
+      }
+
+      exporting = true;
+      statusMessage = null;
+
+      // Export the library
+      const result = await exportLibrary(selectedLibraryId, outputPath);
+
+      // Show success message
+      statusMessage = {
+        type: "success",
+        text: `Exported "${result.library_name}": ${result.patches_exported} patches, ${result.sequences_exported} sequences`
+      };
+
+    } catch (e) {
+      console.error("Export failed:", e);
+      statusMessage = {
+        type: "error",
+        text: `Export failed: ${e}`
+      };
+    } finally {
+      exporting = false;
+
+      // Clear message after 5 seconds
+      setTimeout(() => {
+        statusMessage = null;
       }, 5000);
     }
   }
@@ -87,16 +144,18 @@
     bind:selectedLibraryId
     onImport={handleImport}
     {importing}
+    onExport={handleExport}
+    {exporting}
   />
 
   <main class="flex-1 overflow-hidden flex flex-col">
-    {#if importMessage}
+    {#if statusMessage}
       <div
-        class="mx-4 mt-4 p-3 rounded-lg {importMessage.type === 'success'
+        class="mx-4 mt-4 p-3 rounded-lg {statusMessage.type === 'success'
           ? 'bg-green-500/20 text-green-400 border border-green-500/30'
           : 'bg-red-500/20 text-red-400 border border-red-500/30'}"
       >
-        {importMessage.text}
+        {statusMessage.text}
       </div>
     {/if}
 
