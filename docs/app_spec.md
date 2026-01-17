@@ -1,6 +1,6 @@
 # Moog Muse Patch Manager - Application Specification
 
-**Version:** 1.2
+**Version:** 1.3
 **Last Updated:** January 17, 2026  
 **Target Platforms:** macOS (primary), Linux (secondary)
 
@@ -15,7 +15,7 @@ The Moog Muse Patch Manager is a desktop application for organizing, categorizin
 - **Automatic library naming:** ZIP filename becomes the library name on import (e.g., `Moog Factory Sounds v2.zip` → "Moog Factory Sounds v2")
 - Organize patches with user-defined categories and favorites
 - Search and filter across all libraries or within specific libraries
-- Build custom bank configurations (16 banks × 16 patches) by mixing patches from any library
+- Each library contains 16 banks × 16 patch slots × 16 sequence slots
 - Export complete library structure for transfer to synthesizer
 - Duplicate detection via file hashing (across all libraries)
 - Metadata management (notes, tags, categories)
@@ -187,15 +187,17 @@ CREATE TABLE sequence_categories (
     FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
 );
 
--- Bank configurations (logical groupings for export)
+-- Banks within a library (each library has exactly 16 banks)
 CREATE TABLE banks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    bank_number INTEGER NOT NULL,         -- 1-16
-    name TEXT NOT NULL,                   -- User-defined name (becomes filename.bank)
+    library_id INTEGER NOT NULL,          -- Banks belong to a library
+    bank_number INTEGER NOT NULL,         -- 1-16 within the library
+    name TEXT NOT NULL,                   -- Bank name (becomes filename.bank)
     description TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (bank_number)
+    FOREIGN KEY (library_id) REFERENCES libraries(id) ON DELETE CASCADE,
+    UNIQUE (library_id, bank_number)      -- Bank numbers unique within a library
 );
 
 -- Bank slots: which patches go in which positions
@@ -232,55 +234,54 @@ CREATE INDEX idx_sequences_hash ON sequences(file_hash);
 CREATE INDEX idx_patch_categories_patch ON patch_categories(patch_id);
 CREATE INDEX idx_patch_categories_category ON patch_categories(category_id);
 CREATE INDEX idx_sequence_categories_sequence ON sequence_categories(sequence_id);
-CREATE INDEX idx_banks_number ON banks(bank_number);
+CREATE INDEX idx_banks_library ON banks(library_id);
+CREATE INDEX idx_banks_number ON banks(library_id, bank_number);
 ```
 
 ### 4.2 Data Relationships
 
 ```
+libraries (1) ←→ (16) banks        -- Each library always has exactly 16 banks
 libraries (1) ←→ (N) patches
 libraries (1) ←→ (N) sequences
 
+banks (1) ←→ (16) bank_patches (1) ←→ (0..1) patches    -- 16 patch slots per bank
+banks (1) ←→ (16) bank_sequences (1) ←→ (0..1) sequences -- 16 sequence slots per bank
+
 patches (1) ←→ (N) patch_categories (N) ←→ (1) categories
 sequences (1) ←→ (N) sequence_categories (N) ←→ (1) categories
-
-banks (1) ←→ (N) bank_patches (N) ←→ (0..1) patches
-banks (1) ←→ (N) bank_sequences (N) ←→ (0..1) sequences
 ```
 
 **Hierarchy:**
 ```
-Libraries (source collections)
+Libraries (each containing 16 banks)
 ├── "Moog Factory Sounds v2"
-│   ├── 256 patches (16 banks × 16)
-│   └── 256 sequences
+│   ├── Bank 01: "Bass"
+│   │   ├── Patch slots 1-16 (some filled, some empty)
+│   │   └── Sequence slots 1-16
+│   ├── Bank 02: "Leads"
+│   │   └── ...
+│   └── ... (Banks 03-16)
 ├── "Sound Designer Pack - Bass"
-│   ├── 48 patches
-│   └── 16 sequences
-└── "My Custom Patches"
-    └── 12 patches
-
-Banks (user-organized for export)
-├── Bank 01: "Live Performance"
-│   ├── Patch from "Moog Factory"
-│   ├── Patch from "Bass Pack"
+│   ├── Bank 01-16 (may have sparse content)
 │   └── ...
-└── Bank 02: "Studio Session"
-    └── ...
+└── "My Custom Patches"
+    └── Bank 01-16
 ```
 
 ### 4.3 Key Constraints
 
 - **Library names must be unique** (derived from ZIP filename, user can rename)
+- **Each library has exactly 16 banks** (created on library import)
+- **Banks belong to a library** and do not exist outside that context
+- Bank numbers 1-16 within each library (unique per library, not globally)
+- Patch slots 1-16 per bank
+- Sequence slots 1-16 per bank
 - Patches identified by SHA-256 hash (no duplicates by content across ALL libraries)
 - Sequences identified by SHA-256 hash (no duplicates by content)
 - Each patch/sequence belongs to exactly one source library
-- Bank numbers 1-16 (enforced by application logic)
-- Patch numbers 1-16 per bank
-- Sequence numbers 1-16 per bank
-- Category names must be unique
-- Bank names are user-defined but exported as `<name>.bank` files
-- Banks can contain patches from ANY library (mix and match)
+- Category names must be unique (categories are global, not library-scoped)
+- Bank names are user-defined and exported as `<name>.bank` files
 
 ---
 
@@ -493,19 +494,26 @@ struct CategoryDto {
 
 ```rust
 #[tauri::command]
-async fn get_all_banks() -> Result<Vec<BankDto>, String>
+async fn get_banks_for_library(
+    library_id: i64
+) -> Result<Vec<BankDto>, String>  // Returns all 16 banks for a library
 
 #[tauri::command]
-async fn get_bank_by_number(bank_number: i32) -> Result<BankDto, String>
+async fn get_bank_by_number(
+    library_id: i64,
+    bank_number: i32
+) -> Result<BankDto, String>
 
 #[tauri::command]
 async fn update_bank_name(
+    library_id: i64,
     bank_number: i32,
     name: String
 ) -> Result<(), String>
 
 #[tauri::command]
 async fn assign_patch_to_bank(
+    library_id: i64,
     bank_number: i32,
     patch_number: i32,
     patch_id: Option<i64>  // None = default/empty patch
@@ -513,6 +521,7 @@ async fn assign_patch_to_bank(
 
 #[tauri::command]
 async fn assign_sequence_to_bank(
+    library_id: i64,
     bank_number: i32,
     sequence_number: i32,
     sequence_id: Option<i64>  // None = empty sequence
@@ -520,6 +529,7 @@ async fn assign_sequence_to_bank(
 
 #[tauri::command]
 async fn clear_bank_slot(
+    library_id: i64,
     bank_number: i32,
     patch_number: i32
 ) -> Result<(), String>
@@ -529,11 +539,12 @@ async fn clear_bank_slot(
 ```rust
 struct BankDto {
     id: i64,
-    bank_number: i32,
+    library_id: i64,
+    bank_number: i32,                        // 1-16 within the library
     name: String,
     description: Option<String>,
-    patches: Vec<Option<PatchDto>>,  // 16 slots, Some(patch) or None
-    sequences: Vec<Option<SequenceDto>>,  // 16 slots
+    patches: Vec<Option<PatchDto>>,          // 16 slots, Some(patch) or None
+    sequences: Vec<Option<SequenceDto>>,     // 16 slots
     created_at: String,
     updated_at: String,
 }
@@ -588,19 +599,24 @@ struct ValidationResult {
 ```rust
 #[tauri::command]
 async fn export_library(
+    library_id: i64,
     output_path: String
 ) -> Result<ExportResult, String>
 
 #[tauri::command]
-async fn preview_export() -> Result<ExportPreview, String>
+async fn preview_export(
+    library_id: i64
+) -> Result<ExportPreview, String>
 ```
 
 **ExportResult Structure:**
 ```rust
 struct ExportResult {
+    library_id: i64,
+    library_name: String,
     output_path: String,
     file_size: i64,
-    banks_exported: i32,
+    banks_exported: i32,              // Always 16
     patches_exported: i32,
     sequences_exported: i32,
     empty_slots: i32,
@@ -610,7 +626,9 @@ struct ExportResult {
 **ExportPreview Structure:**
 ```rust
 struct ExportPreview {
-    total_banks: i32,
+    library_id: i64,
+    library_name: String,
+    total_banks: i32,                 // Always 16
     total_patches: i32,
     total_sequences: i32,
     empty_patch_slots: i32,
@@ -1471,6 +1489,7 @@ jobs:
 | 1.0 | 2026-01-12 | Initial | Complete application specification |
 | 1.1 | 2026-01-17 | Update | Added multi-library support: libraries table, library filtering, import workflow with ZIP filename as library name |
 | 1.2 | 2026-01-17 | Update | Removed unimplemented get_library_statistics command; fixed LibraryDto.source_filename to Option<String> |
+| 1.3 | 2026-01-17 | Update | Banks are now library-scoped: each library has exactly 16 banks, banks table has library_id FK, bank APIs require library_id |
 
 ---
 
