@@ -17,6 +17,10 @@ export async function deleteLibrary(id) {
   return invoke("delete_library", { id });
 }
 
+export async function createLibrary(name) {
+  return invoke("create_library", { name });
+}
+
 // Patch operations
 export async function getAllPatches(filter = null) {
   return invoke("get_all_patches", { filter });

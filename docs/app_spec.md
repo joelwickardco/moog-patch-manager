@@ -1,6 +1,6 @@
 # Moog Muse Patch Manager - Application Specification
 
-**Version:** 1.3
+**Version:** 1.4
 **Last Updated:** January 17, 2026  
 **Target Platforms:** macOS (primary), Linux (secondary)
 
@@ -402,6 +402,11 @@ async fn get_all_libraries() -> Result<Vec<LibraryDto>, String>
 async fn get_library_by_id(id: i64) -> Result<LibraryDto, String>
 
 #[tauri::command]
+async fn create_library(name: String) -> Result<LibraryDto, String>
+// Creates a new empty library with 16 banks (each with 16 patch/sequence slots)
+// Returns error if library name already exists
+
+#[tauri::command]
 async fn update_library(
     id: i64,
     name: Option<String>,
@@ -690,18 +695,27 @@ struct ExportPreview {
 **Props:**
 - `libraries: LibraryDto[]`
 - `selectedLibraryId: number | null`
+- `onNewLibrary: () => void`
 
 **Features:**
 - List all imported libraries with color indicators
 - "All Libraries" option to show all patches
 - Click to filter patches by library
 - Library patch/sequence count display
+- "+" button next to "Libraries" header to create new library
 - Context menu: Rename, Change Color, Delete
+
+**New Library Modal:**
+- Triggered by "+" button in sidebar
+- Text input for library name
+- Creates empty library with 16 banks
+- Validates unique library name
 
 **State:**
 ```javascript
 let libraries = [];
 let selectedLibraryId = null; // null = "All"
+let showNewLibraryModal = false;
 ```
 
 #### 6.2.2 PatchList Component
@@ -1490,6 +1504,7 @@ jobs:
 | 1.1 | 2026-01-17 | Update | Added multi-library support: libraries table, library filtering, import workflow with ZIP filename as library name |
 | 1.2 | 2026-01-17 | Update | Removed unimplemented get_library_statistics command; fixed LibraryDto.source_filename to Option<String> |
 | 1.3 | 2026-01-17 | Update | Banks are now library-scoped: each library has exactly 16 banks, banks table has library_id FK, bank APIs require library_id |
+| 1.4 | 2026-01-17 | Update | Added create_library command and "New Library" modal UI with "+" button in sidebar |
 
 ---
 

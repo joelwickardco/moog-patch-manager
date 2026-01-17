@@ -6,7 +6,8 @@
     onImport = () => {},
     importing = false,
     onExport = () => {},
-    exporting = false
+    exporting = false,
+    onNewLibrary = () => {}
   } = $props();
 
   const tabs = [
@@ -44,9 +45,18 @@
     {/each}
 
     <div class="mt-4 pt-4 border-t border-border">
-      <h3 class="px-4 text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
-        Libraries
-      </h3>
+      <div class="flex items-center justify-between px-4 mb-2">
+        <h3 class="text-xs font-semibold text-text-secondary uppercase tracking-wider">
+          Libraries
+        </h3>
+        <button
+          onclick={onNewLibrary}
+          class="w-5 h-5 flex items-center justify-center rounded hover:bg-border text-text-secondary hover:text-primary transition-colors"
+          title="Create new library"
+        >
+          <span class="text-lg leading-none">+</span>
+        </button>
+      </div>
       <button
         class="w-full text-left px-4 py-2 rounded-lg transition-colors flex items-center gap-2
           {selectedLibraryId === null && activeTab === 'library'

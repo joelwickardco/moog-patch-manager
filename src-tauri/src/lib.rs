@@ -35,6 +35,7 @@ pub fn run() {
             // Library commands
             commands::libraries::get_all_libraries,
             commands::libraries::get_library_by_id,
+            commands::libraries::create_library,
             commands::libraries::update_library,
             commands::libraries::delete_library,
             // Patch commands

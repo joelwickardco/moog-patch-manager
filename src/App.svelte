@@ -2,7 +2,8 @@
   import { open, save } from "@tauri-apps/plugin-dialog";
   import Sidebar from "./lib/components/common/Sidebar.svelte";
   import PatchList from "./lib/components/patches/PatchList.svelte";
-  import { getAllLibraries, importLibraryZip, exportLibrary } from "./lib/utils/api.js";
+  import NewLibraryModal from "./lib/components/common/NewLibraryModal.svelte";
+  import { getAllLibraries, importLibraryZip, exportLibrary, createLibrary } from "./lib/utils/api.js";
 
   let activeTab = $state("library");
   let libraries = $state([]);
@@ -10,6 +11,7 @@
   let importing = $state(false);
   let exporting = $state(false);
   let statusMessage = $state(null);
+  let showNewLibraryModal = $state(false);
 
   async function loadLibraries() {
     try {
@@ -131,6 +133,44 @@
     }
   }
 
+  async function handleCreateLibrary(name) {
+    try {
+      await createLibrary(name);
+
+      // Close modal
+      showNewLibraryModal = false;
+
+      // Show success message
+      statusMessage = {
+        type: "success",
+        text: `Created library "${name}"`
+      };
+
+      // Reload libraries
+      await loadLibraries();
+
+      // Clear message after 5 seconds
+      setTimeout(() => {
+        statusMessage = null;
+      }, 5000);
+
+    } catch (e) {
+      console.error("Failed to create library:", e);
+      statusMessage = {
+        type: "error",
+        text: `Failed to create library: ${e}`
+      };
+
+      // Close modal on error too
+      showNewLibraryModal = false;
+
+      // Clear message after 5 seconds
+      setTimeout(() => {
+        statusMessage = null;
+      }, 5000);
+    }
+  }
+
   // Load libraries on mount
   $effect(() => {
     loadLibraries();
@@ -146,6 +186,7 @@
     {importing}
     onExport={handleExport}
     {exporting}
+    onNewLibrary={() => showNewLibraryModal = true}
   />
 
   <main class="flex-1 overflow-hidden flex flex-col">
@@ -176,3 +217,9 @@
     </div>
   </main>
 </div>
+
+<NewLibraryModal
+  open={showNewLibraryModal}
+  onClose={() => showNewLibraryModal = false}
+  onSubmit={handleCreateLibrary}
+/>
