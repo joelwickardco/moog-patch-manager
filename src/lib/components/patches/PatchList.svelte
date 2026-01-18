@@ -20,8 +20,10 @@
     loading = true;
     error = null;
     try {
-      const filter = selectedLibraryId ? { library_id: selectedLibraryId } : null;
-      patches = await getAllPatches(filter);
+      // Patches are now global - selectedLibraryId is used for filtering by source_library if desired
+      const filter = selectedLibraryId ? { source_library: null } : null;
+      // For now, load all patches (patches are global content store)
+      patches = await getAllPatches(null);
     } catch (e) {
       error = e.toString();
       patches = [];

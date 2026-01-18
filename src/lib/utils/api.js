@@ -113,16 +113,20 @@ export async function updateBankName(libraryId, bankNumber, name) {
   return invoke("update_bank_name", { libraryId, bankNumber, name });
 }
 
-export async function assignPatchToBank(libraryId, bankNumber, patchNumber, patchId = null) {
-  return invoke("assign_patch_to_bank", { libraryId, bankNumber, patchNumber, patchId });
+export async function assignPatchToSlot(libraryId, bankNumber, slotNumber, patchId = null) {
+  return invoke("assign_patch_to_slot", { libraryId, bankNumber, slotNumber, patchId });
 }
 
-export async function assignSequenceToBank(libraryId, bankNumber, sequenceNumber, sequenceId = null) {
-  return invoke("assign_sequence_to_bank", { libraryId, bankNumber, sequenceNumber, sequenceId });
+export async function assignSequenceToSlot(libraryId, bankNumber, slotNumber, sequenceId = null) {
+  return invoke("assign_sequence_to_slot", { libraryId, bankNumber, slotNumber, sequenceId });
 }
 
-export async function clearBankSlot(libraryId, bankNumber, patchNumber) {
-  return invoke("clear_bank_slot", { libraryId, bankNumber, patchNumber });
+export async function clearPatchSlot(libraryId, bankNumber, slotNumber) {
+  return invoke("clear_patch_slot", { libraryId, bankNumber, slotNumber });
+}
+
+export async function clearSequenceSlot(libraryId, bankNumber, slotNumber) {
+  return invoke("clear_sequence_slot", { libraryId, bankNumber, slotNumber });
 }
 
 // Import operations

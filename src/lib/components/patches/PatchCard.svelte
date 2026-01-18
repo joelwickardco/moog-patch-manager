@@ -41,9 +41,9 @@
     <div class="flex-1 min-w-0">
       <h3 class="font-medium truncate">{patch.name}</h3>
       <div class="flex items-center gap-2 mt-1">
-        {#if patch.library_name}
+        {#if patch.source_library}
           <span class="text-xs px-2 py-0.5 rounded bg-secondary/20 text-secondary">
-            {patch.library_name}
+            {patch.source_library}
           </span>
         {/if}
         {#if patch.categories?.length}
@@ -83,10 +83,10 @@
       </button>
     </div>
 
-    {#if patch.library_name}
+    {#if patch.source_library}
       <div class="mb-2">
         <span class="text-xs px-2 py-0.5 rounded bg-secondary/20 text-secondary">
-          {patch.library_name}
+          {patch.source_library}
         </span>
       </div>
     {/if}

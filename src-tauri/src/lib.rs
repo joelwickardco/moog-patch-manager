@@ -64,9 +64,10 @@ pub fn run() {
             commands::banks::get_banks_for_library,
             commands::banks::get_bank_by_number,
             commands::banks::update_bank_name,
-            commands::banks::assign_patch_to_bank,
-            commands::banks::assign_sequence_to_bank,
-            commands::banks::clear_bank_slot,
+            commands::banks::assign_patch_to_slot,
+            commands::banks::assign_sequence_to_slot,
+            commands::banks::clear_patch_slot,
+            commands::banks::clear_sequence_slot,
             // Import/Export commands
             commands::import::import_library_zip,
             commands::import::import_bank_directory,

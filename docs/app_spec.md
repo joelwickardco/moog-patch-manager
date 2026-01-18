@@ -1,7 +1,7 @@
 # Moog Muse Patch Manager - Application Specification
 
-**Version:** 1.4
-**Last Updated:** January 17, 2026  
+**Version:** 1.2
+**Last Updated:** January 2026
 **Target Platforms:** macOS (primary), Linux (secondary)
 
 ---
@@ -11,13 +11,12 @@
 The Moog Muse Patch Manager is a desktop application for organizing, categorizing, and managing sound patches and sequences for the Moog Muse synthesizer. The application provides a local database for patch management with features including favorites, user-defined categories, and custom bank organization - capabilities not available in the synthesizer's native filesystem-based organization.
 
 ### Key Features
-- **Multi-library management:** Import multiple patch libraries from different sources (Moog factory, third-party sound designers, user-created)
-- **Automatic library naming:** ZIP filename becomes the library name on import (e.g., `Moog Factory Sounds v2.zip` → "Moog Factory Sounds v2")
+- Import patches/sequences from Moog library archives (.zip) or bank directories
 - Organize patches with user-defined categories and favorites
-- Search and filter across all libraries or within specific libraries
-- Each library contains 16 banks × 16 patch slots × 16 sequence slots
+- Search and filter patch library
+- Build custom bank configurations (16 banks × 16 patches)
 - Export complete library structure for transfer to synthesizer
-- Duplicate detection via file hashing (across all libraries)
+- Duplicate detection via file hashing
 - Metadata management (notes, tags, categories)
 
 ### Design Goals
@@ -116,61 +115,97 @@ walkdir = "2.4"
 
 ### 4.1 Database Schema
 
+The data model reflects the actual Moog Muse filesystem structure where:
+- A **library** is a collection of 16 banks
+- Each **bank** contains 16 patch slots and 16 sequence slots
+- **Patches and sequences** are global content stores (deduplicated by hash)
+- **Bank slots** reference patches/sequences, defining where content appears in a library
+
 ```sql
--- Source libraries (imported ZIP archives)
--- Each ZIP file import creates a new library entry
-CREATE TABLE libraries (
+-- Libraries: a named collection of 16 banks (maps to library/ root directory)
+CREATE TABLE IF NOT EXISTS libraries (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL UNIQUE,            -- Derived from ZIP filename (without .zip extension)
-    description TEXT,                     -- Optional user description
-    source_filename TEXT,                 -- Original ZIP filename for reference
-    color TEXT,                           -- Hex color for UI identification (#FF5733)
-    patch_count INTEGER DEFAULT 0,        -- Cached count for performance
-    sequence_count INTEGER DEFAULT 0,     -- Cached count for performance
+    name TEXT NOT NULL UNIQUE,
+    description TEXT,
+    source_filename TEXT,              -- Original import filename (informational)
+    color TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- Core patch storage
-CREATE TABLE patches (
+-- Banks: 16 per library (maps to library/bankXX/ directories)
+CREATE TABLE IF NOT EXISTS banks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    library_id INTEGER NOT NULL,          -- Which library this patch came from
-    name TEXT NOT NULL,
-    file_data BLOB NOT NULL,              -- .mmp file contents
-    file_hash TEXT NOT NULL UNIQUE,       -- SHA-256 for duplicate detection
-    file_size INTEGER NOT NULL,           -- Size in bytes
-    is_favorite BOOLEAN DEFAULT 0,
-    notes TEXT,                           -- User notes
+    library_id INTEGER NOT NULL,
+    bank_number INTEGER NOT NULL CHECK (bank_number BETWEEN 1 AND 16),
+    name TEXT NOT NULL,                -- Becomes <name>.bank filename on export
+    description TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (library_id) REFERENCES libraries(id) ON DELETE CASCADE
+    FOREIGN KEY (library_id) REFERENCES libraries(id) ON DELETE CASCADE,
+    UNIQUE (library_id, bank_number)
 );
 
--- Sequence storage (independent of patches)
-CREATE TABLE sequences (
+-- Patches: content-addressable store of unique patch data
+-- NOT tied to a specific library - patches are global, reusable assets
+CREATE TABLE IF NOT EXISTS patches (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    library_id INTEGER NOT NULL,          -- Which library this sequence came from
+    name TEXT NOT NULL,                -- Display name (from original filename)
+    file_data BLOB NOT NULL,           -- .mmp file contents
+    file_hash TEXT NOT NULL UNIQUE,    -- SHA-256 for deduplication
+    file_size INTEGER NOT NULL,
+    is_favorite BOOLEAN DEFAULT 0,
+    notes TEXT,
+    source_library TEXT,               -- Informational: which library it came from
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Sequences: content-addressable store (same pattern as patches)
+CREATE TABLE IF NOT EXISTS sequences (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
-    file_data BLOB NOT NULL,              -- .mmseq file contents
-    file_hash TEXT NOT NULL UNIQUE,       -- SHA-256 for duplicate detection
+    file_data BLOB NOT NULL,           -- .mmseq file contents
+    file_hash TEXT NOT NULL UNIQUE,
     file_size INTEGER NOT NULL,
     notes TEXT,
+    source_library TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (library_id) REFERENCES libraries(id) ON DELETE CASCADE
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- User-defined categories (app-only, not in Moog)
-CREATE TABLE categories (
+-- Bank patch slots: maps to library/bankXX/patchYY/ directories
+-- Each bank has exactly 16 slots (1-16)
+CREATE TABLE IF NOT EXISTS bank_patch_slots (
+    bank_id INTEGER NOT NULL,
+    slot_number INTEGER NOT NULL CHECK (slot_number BETWEEN 1 AND 16),
+    patch_id INTEGER,                  -- NULL = empty/default patch (empty directory)
+    PRIMARY KEY (bank_id, slot_number),
+    FOREIGN KEY (bank_id) REFERENCES banks(id) ON DELETE CASCADE,
+    FOREIGN KEY (patch_id) REFERENCES patches(id) ON DELETE SET NULL
+);
+
+-- Bank sequence slots: maps to library/sequences/bankXX/seqYY/ directories
+CREATE TABLE IF NOT EXISTS bank_sequence_slots (
+    bank_id INTEGER NOT NULL,
+    slot_number INTEGER NOT NULL CHECK (slot_number BETWEEN 1 AND 16),
+    sequence_id INTEGER,               -- NULL = empty slot
+    PRIMARY KEY (bank_id, slot_number),
+    FOREIGN KEY (bank_id) REFERENCES banks(id) ON DELETE CASCADE,
+    FOREIGN KEY (sequence_id) REFERENCES sequences(id) ON DELETE SET NULL
+);
+
+-- Categories: user-defined tags (global, not library-specific)
+CREATE TABLE IF NOT EXISTS categories (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,
     description TEXT,
-    color TEXT,                           -- Hex color for UI (#FF5733)
+    color TEXT,                        -- Hex color for UI (#FF5733)
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Many-to-many: patches can have multiple categories
-CREATE TABLE patch_categories (
+CREATE TABLE IF NOT EXISTS patch_categories (
     patch_id INTEGER NOT NULL,
     category_id INTEGER NOT NULL,
     PRIMARY KEY (patch_id, category_id),
@@ -179,7 +214,7 @@ CREATE TABLE patch_categories (
 );
 
 -- Many-to-many: sequences can have multiple categories
-CREATE TABLE sequence_categories (
+CREATE TABLE IF NOT EXISTS sequence_categories (
     sequence_id INTEGER NOT NULL,
     category_id INTEGER NOT NULL,
     PRIMARY KEY (sequence_id, category_id),
@@ -187,101 +222,68 @@ CREATE TABLE sequence_categories (
     FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
 );
 
--- Banks within a library (each library has exactly 16 banks)
-CREATE TABLE banks (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    library_id INTEGER NOT NULL,          -- Banks belong to a library
-    bank_number INTEGER NOT NULL,         -- 1-16 within the library
-    name TEXT NOT NULL,                   -- Bank name (becomes filename.bank)
-    description TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (library_id) REFERENCES libraries(id) ON DELETE CASCADE,
-    UNIQUE (library_id, bank_number)      -- Bank numbers unique within a library
-);
-
--- Bank slots: which patches go in which positions
-CREATE TABLE bank_patches (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    bank_id INTEGER NOT NULL,
-    patch_number INTEGER NOT NULL,        -- 1-16 (slot within bank)
-    patch_id INTEGER,                     -- NULL = default/empty patch
-    FOREIGN KEY (bank_id) REFERENCES banks(id) ON DELETE CASCADE,
-    FOREIGN KEY (patch_id) REFERENCES patches(id) ON DELETE SET NULL,
-    UNIQUE (bank_id, patch_number)
-);
-
--- Bank sequence slots
-CREATE TABLE bank_sequences (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    bank_id INTEGER NOT NULL,
-    sequence_number INTEGER NOT NULL,     -- 1-16 (slot within bank)
-    sequence_id INTEGER,                  -- NULL = empty sequence slot
-    FOREIGN KEY (bank_id) REFERENCES banks(id) ON DELETE CASCADE,
-    FOREIGN KEY (sequence_id) REFERENCES sequences(id) ON DELETE SET NULL,
-    UNIQUE (bank_id, sequence_number)
-);
-
 -- Indexes for performance
-CREATE INDEX idx_libraries_name ON libraries(name COLLATE NOCASE);
-CREATE INDEX idx_patches_library ON patches(library_id);
-CREATE INDEX idx_patches_favorite ON patches(is_favorite);
-CREATE INDEX idx_patches_name ON patches(name COLLATE NOCASE);
-CREATE INDEX idx_patches_hash ON patches(file_hash);
-CREATE INDEX idx_sequences_library ON sequences(library_id);
-CREATE INDEX idx_sequences_name ON sequences(name COLLATE NOCASE);
-CREATE INDEX idx_sequences_hash ON sequences(file_hash);
-CREATE INDEX idx_patch_categories_patch ON patch_categories(patch_id);
-CREATE INDEX idx_patch_categories_category ON patch_categories(category_id);
-CREATE INDEX idx_sequence_categories_sequence ON sequence_categories(sequence_id);
-CREATE INDEX idx_banks_library ON banks(library_id);
-CREATE INDEX idx_banks_number ON banks(library_id, bank_number);
+CREATE INDEX IF NOT EXISTS idx_banks_library ON banks(library_id);
+CREATE INDEX IF NOT EXISTS idx_patches_hash ON patches(file_hash);
+CREATE INDEX IF NOT EXISTS idx_patches_name ON patches(name COLLATE NOCASE);
+CREATE INDEX IF NOT EXISTS idx_patches_favorite ON patches(is_favorite);
+CREATE INDEX IF NOT EXISTS idx_sequences_hash ON sequences(file_hash);
+CREATE INDEX IF NOT EXISTS idx_sequences_name ON sequences(name COLLATE NOCASE);
+CREATE INDEX IF NOT EXISTS idx_bank_patch_slots_patch ON bank_patch_slots(patch_id);
+CREATE INDEX IF NOT EXISTS idx_bank_sequence_slots_sequence ON bank_sequence_slots(sequence_id);
+CREATE INDEX IF NOT EXISTS idx_patch_categories_patch ON patch_categories(patch_id);
+CREATE INDEX IF NOT EXISTS idx_patch_categories_category ON patch_categories(category_id);
+CREATE INDEX IF NOT EXISTS idx_sequence_categories_sequence ON sequence_categories(sequence_id);
 ```
 
 ### 4.2 Data Relationships
 
 ```
-libraries (1) ←→ (16) banks        -- Each library always has exactly 16 banks
-libraries (1) ←→ (N) patches
-libraries (1) ←→ (N) sequences
-
-banks (1) ←→ (16) bank_patches (1) ←→ (0..1) patches    -- 16 patch slots per bank
-banks (1) ←→ (16) bank_sequences (1) ←→ (0..1) sequences -- 16 sequence slots per bank
-
-patches (1) ←→ (N) patch_categories (N) ←→ (1) categories
-sequences (1) ←→ (N) sequence_categories (N) ←→ (1) categories
+┌─────────────────────────────────────────────────────────────────┐
+│                     LIBRARY STRUCTURE                           │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  libraries (1) ──────────────── (16) banks                      │
+│                                       │                         │
+│                          ┌────────────┴────────────┐            │
+│                          │                         │            │
+│                   (16) bank_patch_slots    (16) bank_sequence_slots
+│                          │                         │            │
+│                          ▼                         ▼            │
+│                     (0..1) patches           (0..1) sequences   │
+│                                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│                     CONTENT STORE (Global)                      │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  patches ◄─────── patch_categories ───────► categories          │
+│                                                                 │
+│  sequences ◄───── sequence_categories ────► categories          │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-**Hierarchy:**
+**Filesystem Mapping:**
 ```
-Libraries (each containing 16 banks)
-├── "Moog Factory Sounds v2"
-│   ├── Bank 01: "Bass"
-│   │   ├── Patch slots 1-16 (some filled, some empty)
-│   │   └── Sequence slots 1-16
-│   ├── Bank 02: "Leads"
-│   │   └── ...
-│   └── ... (Banks 03-16)
-├── "Sound Designer Pack - Bass"
-│   ├── Bank 01-16 (may have sparse content)
-│   └── ...
-└── "My Custom Patches"
-    └── Bank 01-16
+library/bank03/pads.bank           → banks(library_id=X, bank_number=3, name="pads")
+library/bank03/patch05/bass.mmp    → 1. patches(name="bass", file_data=..., file_hash=...)
+                                     2. bank_patch_slots(bank_id=Y, slot_number=5, patch_id=Z)
+library/sequences/bank03/seq01/... → similar pattern for sequences
 ```
 
 ### 4.3 Key Constraints
 
-- **Library names must be unique** (derived from ZIP filename, user can rename)
-- **Each library has exactly 16 banks** (created on library import)
-- **Banks belong to a library** and do not exist outside that context
-- Bank numbers 1-16 within each library (unique per library, not globally)
-- Patch slots 1-16 per bank
-- Sequence slots 1-16 per bank
-- Patches identified by SHA-256 hash (no duplicates by content across ALL libraries)
-- Sequences identified by SHA-256 hash (no duplicates by content)
-- Each patch/sequence belongs to exactly one source library
-- Category names must be unique (categories are global, not library-scoped)
-- Bank names are user-defined and exported as `<name>.bank` files
+- Library names must be unique
+- Patches identified by SHA-256 hash (no duplicates by content globally)
+- Sequences identified by SHA-256 hash (no duplicates by content globally)
+- Each library has exactly 16 banks (bank_number 1-16 per library)
+- Each bank has exactly 16 patch slots and 16 sequence slots
+- Slot numbers are 1-16 per bank (enforced by CHECK constraint)
+- Category names must be unique (global)
+- Bank names are user-defined, exported as `<name>.bank` files
+- **Patches/sequences are global**: not owned by libraries, can be referenced by multiple bank slots
+- **Deleting a library**: cascades to banks and slot assignments; patches/sequences remain in global store
+- **Deleting a patch**: sets referencing slot's patch_id to NULL (empty slot)
 
 ---
 
@@ -319,10 +321,10 @@ async fn search_patches(query: String) -> Result<Vec<PatchDto>, String>
 **PatchFilter Structure:**
 ```rust
 struct PatchFilter {
-    library_id: Option<i64>,              // Filter by source library
     is_favorite: Option<bool>,
     category_ids: Option<Vec<i64>>,
     name_contains: Option<String>,
+    source_library: Option<String>,    // Filter by original import source
 }
 ```
 
@@ -330,14 +332,14 @@ struct PatchFilter {
 ```rust
 struct PatchDto {
     id: i64,
-    library_id: i64,
-    library_name: String,                 // Denormalized for display
     name: String,
     file_hash: String,
     file_size: i64,
     is_favorite: bool,
     notes: Option<String>,
+    source_library: Option<String>,    // Informational: where it was imported from
     categories: Vec<CategoryDto>,
+    usage_count: i64,                  // Number of bank slots referencing this patch
     created_at: String,
     updated_at: String,
 }
@@ -370,9 +372,9 @@ async fn search_sequences(query: String) -> Result<Vec<SequenceDto>, String>
 **SequenceFilter Structure:**
 ```rust
 struct SequenceFilter {
-    library_id: Option<i64>,              // Filter by source library
     category_ids: Option<Vec<i64>>,
     name_contains: Option<String>,
+    source_library: Option<String>,    // Filter by original import source
 }
 ```
 
@@ -380,60 +382,19 @@ struct SequenceFilter {
 ```rust
 struct SequenceDto {
     id: i64,
-    library_id: i64,
-    library_name: String,                 // Denormalized for display
     name: String,
     file_hash: String,
     file_size: i64,
     notes: Option<String>,
+    source_library: Option<String>,    // Informational: where it was imported from
     categories: Vec<CategoryDto>,
+    usage_count: i64,                  // Number of bank slots referencing this sequence
     created_at: String,
     updated_at: String,
 }
 ```
 
-### 5.3 Library Management
-
-```rust
-#[tauri::command]
-async fn get_all_libraries() -> Result<Vec<LibraryDto>, String>
-
-#[tauri::command]
-async fn get_library_by_id(id: i64) -> Result<LibraryDto, String>
-
-#[tauri::command]
-async fn create_library(name: String) -> Result<LibraryDto, String>
-// Creates a new empty library with 16 banks (each with 16 patch/sequence slots)
-// Returns error if library name already exists
-
-#[tauri::command]
-async fn update_library(
-    id: i64,
-    name: Option<String>,
-    description: Option<String>,
-    color: Option<String>
-) -> Result<LibraryDto, String>
-
-#[tauri::command]
-async fn delete_library(id: i64) -> Result<(), String>
-```
-
-**LibraryDto Structure:**
-```rust
-struct LibraryDto {
-    id: i64,
-    name: String,
-    description: Option<String>,
-    source_filename: Option<String>,
-    color: Option<String>,
-    patch_count: i64,
-    sequence_count: i64,
-    created_at: String,
-    updated_at: String,
-}
-```
-
-### 5.4 Category Management
+### 5.3 Category Management
 
 ```rust
 #[tauri::command]
@@ -495,16 +456,53 @@ struct CategoryDto {
 }
 ```
 
-### 5.4 Bank Management
+### 5.4 Library Management
 
 ```rust
 #[tauri::command]
-async fn get_banks_for_library(
-    library_id: i64
-) -> Result<Vec<BankDto>, String>  // Returns all 16 banks for a library
+async fn get_all_libraries() -> Result<Vec<LibraryDto>, String>
 
 #[tauri::command]
-async fn get_bank_by_number(
+async fn get_library_by_id(id: i64) -> Result<LibraryDto, String>
+
+#[tauri::command]
+async fn create_library(name: String) -> Result<LibraryDto, String>
+
+#[tauri::command]
+async fn update_library(
+    id: i64,
+    name: Option<String>,
+    description: Option<String>,
+    color: Option<String>
+) -> Result<LibraryDto, String>
+
+#[tauri::command]
+async fn delete_library(id: i64) -> Result<(), String>
+```
+
+**LibraryDto Structure:**
+```rust
+struct LibraryDto {
+    id: i64,
+    name: String,
+    description: Option<String>,
+    source_filename: Option<String>,
+    color: Option<String>,
+    patch_count: i64,
+    sequence_count: i64,
+    created_at: String,
+    updated_at: String,
+}
+```
+
+### 5.5 Bank Management
+
+```rust
+#[tauri::command]
+async fn get_banks_for_library(library_id: i64) -> Result<Vec<BankDto>, String>
+
+#[tauri::command]
+async fn get_bank(
     library_id: i64,
     bank_number: i32
 ) -> Result<BankDto, String>
@@ -517,26 +515,33 @@ async fn update_bank_name(
 ) -> Result<(), String>
 
 #[tauri::command]
-async fn assign_patch_to_bank(
+async fn assign_patch_to_slot(
     library_id: i64,
     bank_number: i32,
-    patch_number: i32,
-    patch_id: Option<i64>  // None = default/empty patch
+    slot_number: i32,          // 1-16
+    patch_id: Option<i64>      // None = clear slot (empty/default patch)
 ) -> Result<(), String>
 
 #[tauri::command]
-async fn assign_sequence_to_bank(
+async fn assign_sequence_to_slot(
     library_id: i64,
     bank_number: i32,
-    sequence_number: i32,
-    sequence_id: Option<i64>  // None = empty sequence
+    slot_number: i32,          // 1-16
+    sequence_id: Option<i64>   // None = clear slot
 ) -> Result<(), String>
 
 #[tauri::command]
-async fn clear_bank_slot(
+async fn clear_patch_slot(
     library_id: i64,
     bank_number: i32,
-    patch_number: i32
+    slot_number: i32
+) -> Result<(), String>
+
+#[tauri::command]
+async fn clear_sequence_slot(
+    library_id: i64,
+    bank_number: i32,
+    slot_number: i32
 ) -> Result<(), String>
 ```
 
@@ -545,17 +550,22 @@ async fn clear_bank_slot(
 struct BankDto {
     id: i64,
     library_id: i64,
-    bank_number: i32,                        // 1-16 within the library
+    bank_number: i32,
     name: String,
     description: Option<String>,
-    patches: Vec<Option<PatchDto>>,          // 16 slots, Some(patch) or None
-    sequences: Vec<Option<SequenceDto>>,     // 16 slots
+    patch_slots: Vec<BankSlotDto<PatchDto>>,     // 16 slots
+    sequence_slots: Vec<BankSlotDto<SequenceDto>>, // 16 slots
     created_at: String,
     updated_at: String,
 }
+
+struct BankSlotDto<T> {
+    slot_number: i32,          // 1-16
+    content: Option<T>,        // Some(patch/sequence) or None for empty slot
+}
 ```
 
-### 5.5 Import Operations
+### 5.6 Import Operations
 
 ```rust
 #[tauri::command]
@@ -565,6 +575,7 @@ async fn import_library_zip(
 
 #[tauri::command]
 async fn import_bank_directory(
+    library_id: i64,
     directory_path: String
 ) -> Result<ImportResult, String>
 
@@ -577,17 +588,24 @@ async fn validate_library_structure(
 **ImportResult Structure:**
 ```rust
 struct ImportResult {
-    library_id: i64,                  // ID of created library
-    library_name: String,             // Name derived from ZIP filename
-    patches_imported: i32,
-    patches_skipped: i32,             // Duplicates by hash (across all libraries)
-    sequences_imported: i32,
-    sequences_skipped: i32,
-    banks_imported: i32,
+    library_id: i64,
+    library_name: String,
+    patches_imported: i32,         // New patches added to global store
+    patches_reused: i32,           // Existing patches (by hash) linked to slots
+    sequences_imported: i32,       // New sequences added to global store
+    sequences_reused: i32,         // Existing sequences linked to slots
+    banks_created: i32,            // Always 16 for a full library import
+    slots_populated: i32,          // Non-empty patch + sequence slots
     errors: Vec<String>,
     warnings: Vec<String>,
 }
 ```
+
+**Import Behavior:**
+- Patches/sequences are added to the global content store (deduplicated by hash)
+- If a patch already exists (same hash), the existing patch is linked to the slot
+- `source_library` field on patches/sequences records where content was first imported from
+- Bank slots are created/updated to reference the appropriate patches/sequences
 
 **ValidationResult Structure:**
 ```rust
@@ -599,7 +617,7 @@ struct ValidationResult {
 }
 ```
 
-### 5.6 Export Operations
+### 5.7 Export Operations
 
 ```rust
 #[tauri::command]
@@ -609,19 +627,15 @@ async fn export_library(
 ) -> Result<ExportResult, String>
 
 #[tauri::command]
-async fn preview_export(
-    library_id: i64
-) -> Result<ExportPreview, String>
+async fn preview_export() -> Result<ExportPreview, String>
 ```
 
 **ExportResult Structure:**
 ```rust
 struct ExportResult {
-    library_id: i64,
-    library_name: String,
     output_path: String,
     file_size: i64,
-    banks_exported: i32,              // Always 16
+    banks_exported: i32,
     patches_exported: i32,
     sequences_exported: i32,
     empty_slots: i32,
@@ -631,9 +645,7 @@ struct ExportResult {
 **ExportPreview Structure:**
 ```rust
 struct ExportPreview {
-    library_id: i64,
-    library_name: String,
-    total_banks: i32,                 // Always 16
+    total_banks: i32,
     total_patches: i32,
     total_sequences: i32,
     empty_patch_slots: i32,
@@ -649,76 +661,31 @@ struct ExportPreview {
 ### 6.1 Application Layout
 
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│  Moog Muse Patch Manager                        [? Help] [⚙️]    │
-├──────────────────────────────────────────────────────────────────┤
-│  📚 Libraries  |  🏦 Banks  |  🏷️ Categories                     │
-├────────────────┬─────────────────────────────────────────────────┤
-│                │  🔍 Search: [__________]  ⭐ ❤️ 🎨 [Library: All]│
-│  LIBRARIES     │                                                  │
-│  ────────────  │  ┌──────────────────────────────────┐           │
-│  📂 All        │  │  Patch Card                      │           │
-│  ├─ 🔴 Moog    │  │  Name: Deep Bass                 │           │
-│  │  Factory    │  │  Library: Moog Factory v2        │           │
-│  ├─ 🟢 Bass    │  │  Categories: Bass, Dark          │           │
-│  │  Pack       │  │  [⭐] [❤️] [✏️] [🗑️]             │           │
-│  └─ 🔵 My      │  └──────────────────────────────────┘           │
-│     Patches    │                                                  │
-│                │  [Similar cards in grid layout...]              │
-│  FILTERS       │                                                  │
-│  ────────────  │                                                  │
-│  ☆ Favorites   │                                                  │
-│                │                                                  │
-│  CATEGORIES    │                                                  │
-│  ────────────  │                                                  │
-│  🏷️ Bass       │                                                  │
-│  🏷️ Lead       │                                                  │
-│  🏷️ Pad        │                                                  │
-│                │                                                  │
-│  [+ Import]    │                                                  │
-│  [↗ Export]    │                                                  │
-└────────────────┴─────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│  Moog Muse Patch Manager            [? Help] [⚙️]   │
+├─────────────────────────────────────────────────────┤
+│  📁 Library  |  🏦 Banks  |  🏷️ Categories          │
+├──────────┬──────────────────────────────────────────┤
+│          │  🔍 Search: [__________]  ⭐ ❤️ 🎨       │
+│ Sidebar  │                                          │
+│          │  ┌──────────────────────────────────┐   │
+│ ☆ Fav    │  │  Patch Card                      │   │
+│ 📂 All   │  │  Name: Deep Bass                 │   │
+│          │  │  Categories: Bass, Dark          │   │
+│ Cat:     │  │  [⭐] [❤️] [✏️] [🗑️]             │   │
+│  Bass    │  └──────────────────────────────────┘   │
+│  Lead    │                                          │
+│  Pad     │  [Similar cards in grid layout...]      │
+│  ...     │                                          │
+│          │                                          │
+│ [Import] │                                          │
+│ [Export] │                                          │
+└──────────┴──────────────────────────────────────────┘
 ```
-
-**Sidebar Hierarchy:**
-- **Libraries section** shows all imported libraries with color indicators
-- Clicking a library filters to show only patches/sequences from that source
-- "All" shows patches from all libraries combined
-- Each library displays its name (derived from ZIP filename) and colored dot
-- Libraries can be renamed by the user after import
 
 ### 6.2 Core Components
 
-#### 6.2.1 LibrarySidebar Component
-**Purpose:** Display all imported libraries for filtering
-
-**Props:**
-- `libraries: LibraryDto[]`
-- `selectedLibraryId: number | null`
-- `onNewLibrary: () => void`
-
-**Features:**
-- List all imported libraries with color indicators
-- "All Libraries" option to show all patches
-- Click to filter patches by library
-- Library patch/sequence count display
-- "+" button next to "Libraries" header to create new library
-- Context menu: Rename, Change Color, Delete
-
-**New Library Modal:**
-- Triggered by "+" button in sidebar
-- Text input for library name
-- Creates empty library with 16 banks
-- Validates unique library name
-
-**State:**
-```javascript
-let libraries = [];
-let selectedLibraryId = null; // null = "All"
-let showNewLibraryModal = false;
-```
-
-#### 6.2.2 PatchList Component
+#### 6.2.1 PatchList Component
 **Purpose:** Display all patches with filtering and search
 
 **Props:**
@@ -737,7 +704,7 @@ let selectedPatches = [];
 let viewMode = 'grid'; // or 'list'
 ```
 
-#### 6.2.3 PatchCard Component
+#### 6.2.2 PatchCard Component
 **Purpose:** Display individual patch with metadata
 
 **Props:**
@@ -750,29 +717,53 @@ let viewMode = 'grid'; // or 'list'
 - Quick actions menu
 - Notes display (expandable)
 
-#### 6.2.4 BankBuilder Component (Phase 2+)
-**Purpose:** Visual 16-slot grid for building banks
+#### 6.2.3 Banks UI Components
+**Purpose:** Visual interface for managing library banks and slots
 
-**Features:**
-- Drag-and-drop patches into slots
-- Bank name editor
-- Empty slot indicators
-- Batch operations
-
-**Layout:**
+**Component Hierarchy:**
 ```
-Bank 03: "My Favorites"
-┌─────┬─────┬─────┬─────┐
-│  1  │  2  │  3  │  4  │
-│ Pch │ Pch │ --- │ Pch │
-├─────┼─────┼─────┼─────┤
-│  5  │  6  │  7  │  8  │
-│ --- │ Pch │ Pch │ Pch │
-└─────┴─────┴─────┴─────┘
-... (continues to 16)
+BanksView (Container)
+├── BankList (Left panel - bank selection)
+└── BankDetail (Right panel - 16 patch + 16 sequence slots)
 ```
 
-#### 6.2.5 CategoryManager Component
+**BanksView Component**
+- Props: `selectedLibraryId`, `libraries`
+- Manages: bank data loading, slot assignment handlers
+- Layout: Two-column layout with status messages
+
+**BankList Component**
+- Props: `banks`, `selectedBankNumber` (bindable), `loading`
+- Features: List of 16 banks per library with slot counts
+- Visual: Scrollable list with active bank highlighting
+
+**BankDetail Component**
+- Props: `bank`, event handlers for slot clicks/drops
+- Features:
+  - 4x4 grid of 16 patch slots
+  - 4x4 grid of 16 sequence slots
+  - Drag-and-drop support for patches and sequences
+  - Visual feedback for drag-over state
+  - Empty slot indicators
+- Layout:
+  ```
+  Bank 03: "Bass Patches"
+
+  Patches (8/16)
+  ┌─────┬─────┬─────┬─────┐
+  │ #01 │ #02 │ #03 │ #04 │
+  │ Pch │ Pch │ --- │ Pch │
+  ├─────┼─────┼─────┼─────┤
+  │ #05 │ #06 │ #07 │ #08 │
+  │ --- │ Pch │ Pch │ Pch │
+  └─────┴─────┴─────┴─────┘
+  ... (continues to 16)
+
+  Sequences (2/16)
+  [Similar 4x4 grid for sequences]
+  ```
+
+#### 6.2.4 CategoryManager Component
 **Purpose:** CRUD operations for categories
 
 **Features:**
@@ -781,7 +772,7 @@ Bank 03: "My Favorites"
 - Delete with confirmation
 - View patches per category
 
-#### 6.2.6 ImportDialog Component
+#### 6.2.5 ImportDialog Component
 **Purpose:** Guide user through import process
 
 **Steps:**
@@ -791,7 +782,7 @@ Bank 03: "My Favorites"
 4. Confirm and execute
 5. Show results
 
-#### 6.2.7 ExportDialog Component
+#### 6.2.6 ExportDialog Component
 **Purpose:** Configure and execute export
 
 **Steps:**
@@ -803,50 +794,86 @@ Bank 03: "My Favorites"
 
 ### 6.3 User Workflows
 
-#### Workflow 1: Import Library
+#### Workflow 1: Import Library from ZIP
 ```
 User Action → System Response
 ──────────────────────────────────────────────
 1. Click "Import" button
-   → Open file picker dialog (accepts .zip files)
+   → Open file/folder picker dialog
 
 2. Select library.zip file
-   → Extract library name from filename:
-     "Moog Factory Sounds v2.zip" → "Moog Factory Sounds v2"
-     "Bass_Pack_2024.zip" → "Bass_Pack_2024"
-   → Validate internal structure (bankXX/ folders)
-   → Show validation results with library name preview
+   → Extract library name from ZIP filename
+   → Validate structure in background
+   → Show validation results
 
-3. Review import preview
-   → Display ImportPreview component showing:
-     - Proposed library name (editable)
-     - Number of patches found
-     - Number of sequences found
-     - Duplicates highlighted (by hash across ALL libraries)
-     - Library color picker (optional)
+3. Review preview (duplicates highlighted)
+   → Display ImportPreview component
+   → Check for name conflicts
 
 4. Confirm import
-   → Create new library entry in database
    → Show progress indicator
-   → Import all patches/sequences with library_id reference
-   → Calculate hashes for duplicate detection
+   → Create new library entry
+   → Import files, calculate hashes
+   → Store patches/sequences in database
+   → Create 16 banks for the library
 
 5. View results
-   → Show ImportResult summary:
-     - Library: "Moog Factory Sounds v2" created
-     - Patches imported: 128
-     - Sequences imported: 64
-     - Duplicates skipped: 3
-   → Navigate to newly imported library in sidebar
+   → Show ImportResult summary with library name
+   → Auto-select newly imported library
+   → Navigate to imported library's patches
 ```
 
-**Library Name Rules:**
-- File extension (.zip) is stripped
-- Name must be unique; duplicates prompt user to rename
-- User can edit the name during import preview
-- Original filename stored in `source_filename` for reference
+#### Workflow 2: Copy Patches to Build Custom Library
+```
+User Action → System Response
+──────────────────────────────────────────────
+1. Create new empty library
+   → Click "+" button in sidebar
+   → Modal: "Create New Library"
+   → Enter name (e.g., "My Live Set")
+   → Library created with 16 empty banks
 
-#### Workflow 2: Organize Patches
+2. Browse existing patches
+   → Navigate to Libraries tab
+   → Search/filter patches from any library
+   → "All Libraries" or specific library filter
+
+3. Copy patch to new library
+   → Click copy icon (📋) on patch card (left of favorite star)
+   → CopyPatchModal opens:
+     - Library selector: "My Live Set" (dropdown)
+     - Bank selector: "Bank 03: Bass" (dropdown)
+     - Slot selector: "Next available" (default) or specific slot
+   → Click "Copy Patch"
+   → Patch data duplicated to destination bank slot
+   → Success notification shown
+
+4. Continue copying patches
+   → Modal appears for each copy operation
+   → User selects destination library/bank/slot each time
+   → Builds custom library incrementally
+
+5. Repeat for all desired patches
+   → Build complete custom library
+   → Banks filled with curated patches
+
+6. Export library
+   → Navigate to Banks tab
+   → Select "My Live Set" library
+   → Click "Export Library"
+   → Save .zip file
+   → Transfer to synthesizer
+```
+
+**Key Benefits of This Workflow:**
+- ✅ Never leave Libraries tab (stay in browsing mode)
+- ✅ Explicit destination selection (no guessing)
+- ✅ Can copy from any library to any other library
+- ✅ Non-destructive (original patches unchanged)
+- ✅ Works well with search/filter to find patches
+- ✅ Copy creates new patch entry (duplicate data, not reference)
+
+#### Workflow 3: Organize Patches
 ```
 User Action → System Response
 ──────────────────────────────────────────────
@@ -868,29 +895,40 @@ User Action → System Response
    → Save to DB
 ```
 
-#### Workflow 3: Build and Export Banks
+#### Workflow 4: Organize Banks and Export Library
 ```
 User Action → System Response
 ──────────────────────────────────────────────
 1. Navigate to "Banks" tab
-   → Show all 16 banks with current assignments
-   
+   → Select a library from sidebar
+   → BanksView shows 16 banks for selected library
+
 2. Select bank to edit (e.g., Bank 03)
-   → Open BankBuilder with 16 slots
-   
-3. Name the bank (e.g., "Live Set")
+   → BankList highlights selected bank
+   → BankDetail shows 16 patch slots + 16 sequence slots
+
+3. Edit bank name (optional)
+   → Click name to edit (e.g., "Live Set Bass")
    → Update bank name in DB
-   
-4. Drag patches into slots 1-16
+
+4. Drag patches into slots
+   → Drag from library or from other bank slots
+   → Drop into target slot
    → Update bank_patches table
-   → Show visual feedback
-   
-5. Repeat for other banks
-   
-6. Click "Export Library"
+   → Visual feedback during drag/drop
+
+5. Drag sequences into sequence slots
+   → Same drag-and-drop workflow for sequences
+   → Update bank_sequences table
+
+6. Repeat for other banks
+   → Select different bank from BankList
+   → Continue organizing patches/sequences
+
+7. Click "Export Library"
    → Show ExportPreview
    → Select output location
-   → Generate ZIP with full structure
+   → Generate ZIP with library structure (16 banks)
    → Show success with file path
 ```
 
@@ -949,7 +987,7 @@ moog-muse-manager/
 │   │   ├── main.rs                 # App entry point
 │   │   ├── commands/               # Tauri command handlers
 │   │   │   ├── mod.rs
-│   │   │   ├── libraries.rs        # Library CRUD operations
+│   │   │   ├── libraries.rs
 │   │   │   ├── patches.rs
 │   │   │   ├── sequences.rs
 │   │   │   ├── categories.rs
@@ -963,7 +1001,7 @@ moog-muse-manager/
 │   │   │   └── migrations.rs
 │   │   ├── models/                 # Data structures
 │   │   │   ├── mod.rs
-│   │   │   ├── library.rs          # Library model and DTOs
+│   │   │   ├── library.rs
 │   │   │   ├── patch.rs
 │   │   │   ├── sequence.rs
 │   │   │   ├── category.rs
@@ -984,10 +1022,6 @@ moog-muse-manager/
 ├── src/                            # Svelte frontend
 │   ├── lib/
 │   │   ├── components/
-│   │   │   ├── libraries/
-│   │   │   │   ├── LibrarySidebar.svelte
-│   │   │   │   ├── LibraryCard.svelte
-│   │   │   │   └── LibraryColorPicker.svelte
 │   │   │   ├── patches/
 │   │   │   │   ├── PatchList.svelte
 │   │   │   │   ├── PatchCard.svelte
@@ -997,9 +1031,9 @@ moog-muse-manager/
 │   │   │   │   ├── SequenceList.svelte
 │   │   │   │   └── SequenceCard.svelte
 │   │   │   ├── banks/
-│   │   │   │   ├── BankList.svelte
-│   │   │   │   ├── BankBuilder.svelte  # Phase 2
-│   │   │   │   └── BankSlot.svelte
+│   │   │   │   ├── BanksView.svelte    # Container component
+│   │   │   │   ├── BankList.svelte     # Left panel - bank selection
+│   │   │   │   └── BankDetail.svelte   # Right panel - slot grid
 │   │   │   ├── categories/
 │   │   │   │   ├── CategoryManager.svelte
 │   │   │   │   ├── CategoryBadge.svelte
@@ -1014,9 +1048,9 @@ moog-muse-manager/
 │   │   │       ├── Button.svelte
 │   │   │       ├── Modal.svelte
 │   │   │       ├── SearchBar.svelte
-│   │   │       └── Sidebar.svelte
+│   │   │       ├── Sidebar.svelte
+│   │   │       └── NewLibraryModal.svelte
 │   │   ├── stores/
-│   │   │   ├── libraries.js        # Library state and selection
 │   │   │   ├── patches.js          # Patch state management
 │   │   │   ├── sequences.js
 │   │   │   ├── categories.js
@@ -1501,10 +1535,8 @@ jobs:
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0 | 2026-01-12 | Initial | Complete application specification |
-| 1.1 | 2026-01-17 | Update | Added multi-library support: libraries table, library filtering, import workflow with ZIP filename as library name |
-| 1.2 | 2026-01-17 | Update | Removed unimplemented get_library_statistics command; fixed LibraryDto.source_filename to Option<String> |
-| 1.3 | 2026-01-17 | Update | Banks are now library-scoped: each library has exactly 16 banks, banks table has library_id FK, bank APIs require library_id |
-| 1.4 | 2026-01-17 | Update | Added create_library command and "New Library" modal UI with "+" button in sidebar |
+| 1.1 | 2026-01-18 | Update | Updated schema to reflect multi-library implementation with library-scoped banks, added Library Management API (section 5.4), updated BanksView/BankList/BankDetail components, added Copy Patch workflow |
+| 1.2 | 2026-01-18 | Update | **Major data model revision**: Patches/sequences are now global content stores (not library-owned). Removed `library_id` from patches/sequences tables. Added `source_library` informational field. Renamed `bank_patches`/`bank_sequences` to `bank_patch_slots`/`bank_sequence_slots` with composite primary keys. Updated API DTOs to reflect new model. This aligns the data model with actual Moog filesystem structure per moog_spec.md section 2.1. |
 
 ---
 

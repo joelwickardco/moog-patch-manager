@@ -49,26 +49,26 @@ pub async fn export_library(
         // Get patches for this bank
         let mut patch_stmt = conn
             .prepare(
-                "SELECT bp.patch_number, p.name, p.file_data
-                 FROM bank_patches bp
-                 LEFT JOIN patches p ON bp.patch_id = p.id
-                 WHERE bp.bank_id = ?1
-                 ORDER BY bp.patch_number",
+                "SELECT bps.slot_number, p.name, p.file_data
+                 FROM bank_patch_slots bps
+                 LEFT JOIN patches p ON bps.patch_id = p.id
+                 WHERE bps.bank_id = ?1
+                 ORDER BY bps.slot_number",
             )
             .map_err(|e| e.to_string())?;
 
         let patch_rows = patch_stmt
             .query_map(params![bank_id], |row| {
-                let patch_number: i32 = row.get(0)?;
+                let slot_number: i32 = row.get(0)?;
                 let name: Option<String> = row.get(1)?;
                 let file_data: Option<Vec<u8>> = row.get(2)?;
-                Ok((patch_number, name, file_data))
+                Ok((slot_number, name, file_data))
             })
             .map_err(|e| e.to_string())?;
 
         for row in patch_rows {
-            let (patch_number, name, file_data) = row.map_err(|e| e.to_string())?;
-            let idx = (patch_number - 1) as usize;
+            let (slot_number, name, file_data) = row.map_err(|e| e.to_string())?;
+            let idx = (slot_number - 1) as usize;
             if idx < 16 {
                 if let (Some(name), Some(data)) = (name, file_data) {
                     patches[idx] = Some(ExportPatch {
@@ -85,26 +85,26 @@ pub async fn export_library(
         // Get sequences for this bank
         let mut seq_stmt = conn
             .prepare(
-                "SELECT bs.sequence_number, s.name, s.file_data
-                 FROM bank_sequences bs
-                 LEFT JOIN sequences s ON bs.sequence_id = s.id
-                 WHERE bs.bank_id = ?1
-                 ORDER BY bs.sequence_number",
+                "SELECT bss.slot_number, s.name, s.file_data
+                 FROM bank_sequence_slots bss
+                 LEFT JOIN sequences s ON bss.sequence_id = s.id
+                 WHERE bss.bank_id = ?1
+                 ORDER BY bss.slot_number",
             )
             .map_err(|e| e.to_string())?;
 
         let seq_rows = seq_stmt
             .query_map(params![bank_id], |row| {
-                let seq_number: i32 = row.get(0)?;
+                let slot_number: i32 = row.get(0)?;
                 let name: Option<String> = row.get(1)?;
                 let file_data: Option<Vec<u8>> = row.get(2)?;
-                Ok((seq_number, name, file_data))
+                Ok((slot_number, name, file_data))
             })
             .map_err(|e| e.to_string())?;
 
         for row in seq_rows {
-            let (seq_number, name, file_data) = row.map_err(|e| e.to_string())?;
-            let idx = (seq_number - 1) as usize;
+            let (slot_number, name, file_data) = row.map_err(|e| e.to_string())?;
+            let idx = (slot_number - 1) as usize;
             if idx < 16 {
                 if let (Some(name), Some(data)) = (name, file_data) {
                     sequences[idx] = Some(ExportSequence {
@@ -168,23 +168,23 @@ pub async fn preview_export(
         )
         .map_err(|e| format!("Library not found: {}", e))?;
 
-    // Count patches in bank_patches for this library's banks
+    // Count patches in bank_patch_slots for this library's banks
     let total_patches: i32 = conn
         .query_row(
-            "SELECT COUNT(*) FROM bank_patches bp
-             JOIN banks b ON bp.bank_id = b.id
-             WHERE b.library_id = ?1 AND bp.patch_id IS NOT NULL",
+            "SELECT COUNT(*) FROM bank_patch_slots bps
+             JOIN banks b ON bps.bank_id = b.id
+             WHERE b.library_id = ?1 AND bps.patch_id IS NOT NULL",
             params![library_id],
             |row| row.get(0),
         )
         .map_err(|e| e.to_string())?;
 
-    // Count sequences in bank_sequences for this library's banks
+    // Count sequences in bank_sequence_slots for this library's banks
     let total_sequences: i32 = conn
         .query_row(
-            "SELECT COUNT(*) FROM bank_sequences bs
-             JOIN banks b ON bs.bank_id = b.id
-             WHERE b.library_id = ?1 AND bs.sequence_id IS NOT NULL",
+            "SELECT COUNT(*) FROM bank_sequence_slots bss
+             JOIN banks b ON bss.bank_id = b.id
+             WHERE b.library_id = ?1 AND bss.sequence_id IS NOT NULL",
             params![library_id],
             |row| row.get(0),
         )
@@ -197,8 +197,8 @@ pub async fn preview_export(
     let estimated_size: i64 = conn
         .query_row(
             "SELECT COALESCE(SUM(p.file_size), 0) FROM patches p
-             JOIN bank_patches bp ON p.id = bp.patch_id
-             JOIN banks b ON bp.bank_id = b.id
+             JOIN bank_patch_slots bps ON p.id = bps.patch_id
+             JOIN banks b ON bps.bank_id = b.id
              WHERE b.library_id = ?1",
             params![library_id],
             |row| row.get(0),
@@ -208,8 +208,8 @@ pub async fn preview_export(
     let seq_size: i64 = conn
         .query_row(
             "SELECT COALESCE(SUM(s.file_size), 0) FROM sequences s
-             JOIN bank_sequences bs ON s.id = bs.sequence_id
-             JOIN banks b ON bs.bank_id = b.id
+             JOIN bank_sequence_slots bss ON s.id = bss.sequence_id
+             JOIN banks b ON bss.bank_id = b.id
              WHERE b.library_id = ?1",
             params![library_id],
             |row| row.get(0),

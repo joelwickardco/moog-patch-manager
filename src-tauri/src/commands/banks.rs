@@ -1,6 +1,6 @@
 use rusqlite::params;
 use tauri::State;
-use crate::models::{BankDto, PatchDto, SequenceDto};
+use crate::models::{BankDto, BankSlotDto, PatchDto, SequenceDto};
 use crate::AppState;
 
 #[tauri::command]
@@ -38,8 +38,8 @@ pub async fn get_banks_for_library(
         let (id, lib_id, bank_number, name, description, created_at, updated_at) =
             bank_result.map_err(|e| e.to_string())?;
 
-        let patches = get_bank_patches(conn, id)?;
-        let sequences = get_bank_sequences(conn, id)?;
+        let patch_slots = get_bank_patch_slots(conn, id)?;
+        let sequence_slots = get_bank_sequence_slots(conn, id)?;
 
         banks.push(BankDto {
             id,
@@ -47,8 +47,8 @@ pub async fn get_banks_for_library(
             bank_number,
             name,
             description,
-            patches,
-            sequences,
+            patch_slots,
+            sequence_slots,
             created_at,
             updated_at,
         });
@@ -75,8 +75,8 @@ pub async fn get_bank_by_number(
         )
         .map_err(|e| e.to_string())?;
 
-    let patches = get_bank_patches(conn, id)?;
-    let sequences = get_bank_sequences(conn, id)?;
+    let patch_slots = get_bank_patch_slots(conn, id)?;
+    let sequence_slots = get_bank_sequence_slots(conn, id)?;
 
     Ok(BankDto {
         id,
@@ -84,8 +84,8 @@ pub async fn get_bank_by_number(
         bank_number,
         name,
         description,
-        patches,
-        sequences,
+        patch_slots,
+        sequence_slots,
         created_at,
         updated_at,
     })
@@ -112,11 +112,11 @@ pub async fn update_bank_name(
 }
 
 #[tauri::command]
-pub async fn assign_patch_to_bank(
+pub async fn assign_patch_to_slot(
     state: State<'_, AppState>,
     library_id: i64,
     bank_number: i32,
-    patch_number: i32,
+    slot_number: i32,
     patch_id: Option<i64>,
 ) -> Result<(), String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
@@ -130,9 +130,10 @@ pub async fn assign_patch_to_bank(
         )
         .map_err(|e| e.to_string())?;
 
+    // Use INSERT OR REPLACE since we have composite primary key
     conn.execute(
-        "UPDATE bank_patches SET patch_id = ?1 WHERE bank_id = ?2 AND patch_number = ?3",
-        params![patch_id, bank_id, patch_number],
+        "INSERT OR REPLACE INTO bank_patch_slots (bank_id, slot_number, patch_id) VALUES (?1, ?2, ?3)",
+        params![bank_id, slot_number, patch_id],
     )
     .map_err(|e| e.to_string())?;
 
@@ -147,11 +148,11 @@ pub async fn assign_patch_to_bank(
 }
 
 #[tauri::command]
-pub async fn assign_sequence_to_bank(
+pub async fn assign_sequence_to_slot(
     state: State<'_, AppState>,
     library_id: i64,
     bank_number: i32,
-    sequence_number: i32,
+    slot_number: i32,
     sequence_id: Option<i64>,
 ) -> Result<(), String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
@@ -165,9 +166,10 @@ pub async fn assign_sequence_to_bank(
         )
         .map_err(|e| e.to_string())?;
 
+    // Use INSERT OR REPLACE since we have composite primary key
     conn.execute(
-        "UPDATE bank_sequences SET sequence_id = ?1 WHERE bank_id = ?2 AND sequence_number = ?3",
-        params![sequence_id, bank_id, sequence_number],
+        "INSERT OR REPLACE INTO bank_sequence_slots (bank_id, slot_number, sequence_id) VALUES (?1, ?2, ?3)",
+        params![bank_id, slot_number, sequence_id],
     )
     .map_err(|e| e.to_string())?;
 
@@ -182,109 +184,66 @@ pub async fn assign_sequence_to_bank(
 }
 
 #[tauri::command]
-pub async fn clear_bank_slot(
+pub async fn clear_patch_slot(
     state: State<'_, AppState>,
     library_id: i64,
     bank_number: i32,
-    patch_number: i32,
+    slot_number: i32,
 ) -> Result<(), String> {
-    assign_patch_to_bank(state, library_id, bank_number, patch_number, None).await
+    assign_patch_to_slot(state, library_id, bank_number, slot_number, None).await
 }
 
-fn get_bank_patches(
+#[tauri::command]
+pub async fn clear_sequence_slot(
+    state: State<'_, AppState>,
+    library_id: i64,
+    bank_number: i32,
+    slot_number: i32,
+) -> Result<(), String> {
+    assign_sequence_to_slot(state, library_id, bank_number, slot_number, None).await
+}
+
+fn get_bank_patch_slots(
     conn: &rusqlite::Connection,
     bank_id: i64,
-) -> Result<Vec<Option<PatchDto>>, String> {
-    let mut patches = vec![None; 16];
+) -> Result<Vec<BankSlotDto<PatchDto>>, String> {
+    let mut slots: Vec<BankSlotDto<PatchDto>> = (1..=16)
+        .map(|n| BankSlotDto {
+            slot_number: n,
+            content: None,
+        })
+        .collect();
 
     let mut stmt = conn
         .prepare(
-            "SELECT bp.patch_number, p.id, p.library_id, l.name as library_name,
-                    p.name, p.file_hash, p.file_size, p.is_favorite,
-                    p.notes, p.created_at, p.updated_at
-             FROM bank_patches bp
-             LEFT JOIN patches p ON bp.patch_id = p.id
-             LEFT JOIN libraries l ON p.library_id = l.id
-             WHERE bp.bank_id = ?1
-             ORDER BY bp.patch_number",
+            "SELECT bps.slot_number, p.id, p.name, p.file_hash, p.file_size, p.is_favorite,
+                    p.notes, p.source_library, p.created_at, p.updated_at,
+                    (SELECT COUNT(*) FROM bank_patch_slots WHERE patch_id = p.id) as usage_count
+             FROM bank_patch_slots bps
+             LEFT JOIN patches p ON bps.patch_id = p.id
+             WHERE bps.bank_id = ?1
+             ORDER BY bps.slot_number",
         )
         .map_err(|e| e.to_string())?;
 
     let rows = stmt
         .query_map(params![bank_id], |row| {
-            let patch_number: i32 = row.get(0)?;
+            let slot_number: i32 = row.get(0)?;
             let patch_id: Option<i64> = row.get(1)?;
 
             if patch_id.is_some() {
                 Ok(Some((
-                    patch_number,
+                    slot_number,
                     PatchDto {
                         id: row.get(1)?,
-                        library_id: row.get(2)?,
-                        library_name: row.get::<_, Option<String>>(3)?.unwrap_or_default(),
-                        name: row.get(4)?,
-                        file_hash: row.get(5)?,
-                        file_size: row.get(6)?,
-                        is_favorite: row.get(7)?,
-                        notes: row.get(8)?,
+                        name: row.get(2)?,
+                        file_hash: row.get(3)?,
+                        file_size: row.get(4)?,
+                        is_favorite: row.get(5)?,
+                        notes: row.get(6)?,
+                        source_library: row.get(7)?,
                         categories: Vec::new(),
-                        created_at: row.get(9)?,
-                        updated_at: row.get(10)?,
-                    },
-                )))
-            } else {
-                Ok(None)
-            }
-        })
-        .map_err(|e| e.to_string())?;
-
-    for row in rows {
-        if let Some((patch_number, patch)) = row.map_err(|e| e.to_string())? {
-            let idx = (patch_number - 1) as usize;
-            if idx < 16 {
-                patches[idx] = Some(patch);
-            }
-        }
-    }
-
-    Ok(patches)
-}
-
-fn get_bank_sequences(
-    conn: &rusqlite::Connection,
-    bank_id: i64,
-) -> Result<Vec<Option<SequenceDto>>, String> {
-    let mut sequences = vec![None; 16];
-
-    let mut stmt = conn
-        .prepare(
-            "SELECT bs.sequence_number, s.id, s.library_id, l.name as library_name,
-                    s.name, s.file_hash, s.file_size, s.notes, s.created_at, s.updated_at
-             FROM bank_sequences bs
-             LEFT JOIN sequences s ON bs.sequence_id = s.id
-             LEFT JOIN libraries l ON s.library_id = l.id
-             WHERE bs.bank_id = ?1
-             ORDER BY bs.sequence_number",
-        )
-        .map_err(|e| e.to_string())?;
-
-    let rows = stmt
-        .query_map(params![bank_id], |row| {
-            let seq_number: i32 = row.get(0)?;
-            let seq_id: Option<i64> = row.get(1)?;
-
-            if seq_id.is_some() {
-                Ok(Some((
-                    seq_number,
-                    SequenceDto {
-                        id: row.get(1)?,
-                        library_id: row.get(2)?,
-                        library_name: row.get::<_, Option<String>>(3)?.unwrap_or_default(),
-                        name: row.get(4)?,
-                        file_hash: row.get(5)?,
-                        file_size: row.get(6)?,
-                        notes: row.get(7)?,
-                        categories: Vec::new(),
+                        usage_count: row.get(10)?,
                         created_at: row.get(8)?,
                         updated_at: row.get(9)?,
                     },
@@ -296,13 +255,75 @@ fn get_bank_sequences(
         .map_err(|e| e.to_string())?;
 
     for row in rows {
-        if let Some((seq_number, seq)) = row.map_err(|e| e.to_string())? {
-            let idx = (seq_number - 1) as usize;
+        if let Some((slot_number, patch)) = row.map_err(|e| e.to_string())? {
+            let idx = (slot_number - 1) as usize;
             if idx < 16 {
-                sequences[idx] = Some(seq);
+                slots[idx].content = Some(patch);
             }
         }
     }
 
-    Ok(sequences)
+    Ok(slots)
+}
+
+fn get_bank_sequence_slots(
+    conn: &rusqlite::Connection,
+    bank_id: i64,
+) -> Result<Vec<BankSlotDto<SequenceDto>>, String> {
+    let mut slots: Vec<BankSlotDto<SequenceDto>> = (1..=16)
+        .map(|n| BankSlotDto {
+            slot_number: n,
+            content: None,
+        })
+        .collect();
+
+    let mut stmt = conn
+        .prepare(
+            "SELECT bss.slot_number, s.id, s.name, s.file_hash, s.file_size,
+                    s.notes, s.source_library, s.created_at, s.updated_at,
+                    (SELECT COUNT(*) FROM bank_sequence_slots WHERE sequence_id = s.id) as usage_count
+             FROM bank_sequence_slots bss
+             LEFT JOIN sequences s ON bss.sequence_id = s.id
+             WHERE bss.bank_id = ?1
+             ORDER BY bss.slot_number",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let rows = stmt
+        .query_map(params![bank_id], |row| {
+            let slot_number: i32 = row.get(0)?;
+            let seq_id: Option<i64> = row.get(1)?;
+
+            if seq_id.is_some() {
+                Ok(Some((
+                    slot_number,
+                    SequenceDto {
+                        id: row.get(1)?,
+                        name: row.get(2)?,
+                        file_hash: row.get(3)?,
+                        file_size: row.get(4)?,
+                        notes: row.get(5)?,
+                        source_library: row.get(6)?,
+                        categories: Vec::new(),
+                        usage_count: row.get(9)?,
+                        created_at: row.get(7)?,
+                        updated_at: row.get(8)?,
+                    },
+                )))
+            } else {
+                Ok(None)
+            }
+        })
+        .map_err(|e| e.to_string())?;
+
+    for row in rows {
+        if let Some((slot_number, seq)) = row.map_err(|e| e.to_string())? {
+            let idx = (slot_number - 1) as usize;
+            if idx < 16 {
+                slots[idx].content = Some(seq);
+            }
+        }
+    }
+
+    Ok(slots)
 }

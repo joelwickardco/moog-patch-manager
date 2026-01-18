@@ -135,7 +135,7 @@ async fn import_from_directory(
 
     let library_id = conn.last_insert_rowid();
 
-    let mut result = ImportResult::new(library_id, unique_name);
+    let mut result = ImportResult::new(library_id, unique_name.clone());
     result.warnings = parsed.warnings;
 
     // Create 16 banks for this library
@@ -154,32 +154,32 @@ async fn import_from_directory(
 
         let bank_id = conn.last_insert_rowid();
 
-        // Create 16 patch slots for this bank
-        for patch_num in 1..=16 {
+        // Create 16 patch slots for this bank (initially empty)
+        for slot_num in 1..=16 {
             conn.execute(
-                "INSERT INTO bank_patches (bank_id, patch_number, patch_id) VALUES (?1, ?2, NULL)",
-                params![bank_id, patch_num],
+                "INSERT INTO bank_patch_slots (bank_id, slot_number, patch_id) VALUES (?1, ?2, NULL)",
+                params![bank_id, slot_num],
             )
             .map_err(|e| e.to_string())?;
         }
 
-        // Create 16 sequence slots for this bank
-        for seq_num in 1..=16 {
+        // Create 16 sequence slots for this bank (initially empty)
+        for slot_num in 1..=16 {
             conn.execute(
-                "INSERT INTO bank_sequences (bank_id, sequence_number, sequence_id) VALUES (?1, ?2, NULL)",
-                params![bank_id, seq_num],
+                "INSERT INTO bank_sequence_slots (bank_id, slot_number, sequence_id) VALUES (?1, ?2, NULL)",
+                params![bank_id, slot_num],
             )
             .map_err(|e| e.to_string())?;
         }
 
-        result.banks_imported += 1;
+        result.banks_created += 1;
     }
 
     // Import patches
     for patch in parsed.patches {
         let hash = calculate_sha256(&patch.file_data);
 
-        // Check for duplicate across ALL libraries
+        // Check for duplicate in global content store
         let existing: Option<i64> = conn
             .query_row(
                 "SELECT id FROM patches WHERE file_hash = ?1",
@@ -189,20 +189,20 @@ async fn import_from_directory(
             .ok();
 
         let patch_id = if let Some(id) = existing {
-            result.patches_skipped += 1;
+            result.patches_reused += 1;
             id
         } else {
-            // Insert new patch with library_id
+            // Insert new patch into global content store with source_library
             conn.execute(
-                "INSERT INTO patches (library_id, name, file_data, file_hash, file_size) VALUES (?1, ?2, ?3, ?4, ?5)",
-                params![library_id, patch.name, patch.file_data, hash, patch.file_data.len() as i64],
+                "INSERT INTO patches (name, file_data, file_hash, file_size, source_library) VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![patch.name, patch.file_data, hash, patch.file_data.len() as i64, unique_name],
             )
             .map_err(|e| e.to_string())?;
             result.patches_imported += 1;
             conn.last_insert_rowid()
         };
 
-        // Link to bank (using library_id to find the correct bank)
+        // Link to bank slot
         let bank_id: i64 = conn
             .query_row(
                 "SELECT id FROM banks WHERE library_id = ?1 AND bank_number = ?2",
@@ -212,17 +212,19 @@ async fn import_from_directory(
             .map_err(|e| e.to_string())?;
 
         conn.execute(
-            "UPDATE bank_patches SET patch_id = ?1 WHERE bank_id = ?2 AND patch_number = ?3",
+            "UPDATE bank_patch_slots SET patch_id = ?1 WHERE bank_id = ?2 AND slot_number = ?3",
             params![patch_id, bank_id, patch.patch_number],
         )
         .map_err(|e| e.to_string())?;
+
+        result.slots_populated += 1;
     }
 
     // Import sequences
     for seq in parsed.sequences {
         let hash = calculate_sha256(&seq.file_data);
 
-        // Check for duplicate across ALL libraries
+        // Check for duplicate in global content store
         let existing: Option<i64> = conn
             .query_row(
                 "SELECT id FROM sequences WHERE file_hash = ?1",
@@ -232,20 +234,20 @@ async fn import_from_directory(
             .ok();
 
         let seq_id = if let Some(id) = existing {
-            result.sequences_skipped += 1;
+            result.sequences_reused += 1;
             id
         } else {
-            // Insert new sequence with library_id
+            // Insert new sequence into global content store with source_library
             conn.execute(
-                "INSERT INTO sequences (library_id, name, file_data, file_hash, file_size) VALUES (?1, ?2, ?3, ?4, ?5)",
-                params![library_id, seq.name, seq.file_data, hash, seq.file_data.len() as i64],
+                "INSERT INTO sequences (name, file_data, file_hash, file_size, source_library) VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![seq.name, seq.file_data, hash, seq.file_data.len() as i64, unique_name],
             )
             .map_err(|e| e.to_string())?;
             result.sequences_imported += 1;
             conn.last_insert_rowid()
         };
 
-        // Link to bank (using library_id to find the correct bank)
+        // Link to bank slot
         let bank_id: i64 = conn
             .query_row(
                 "SELECT id FROM banks WHERE library_id = ?1 AND bank_number = ?2",
@@ -255,16 +257,18 @@ async fn import_from_directory(
             .map_err(|e| e.to_string())?;
 
         conn.execute(
-            "UPDATE bank_sequences SET sequence_id = ?1 WHERE bank_id = ?2 AND sequence_number = ?3",
+            "UPDATE bank_sequence_slots SET sequence_id = ?1 WHERE bank_id = ?2 AND slot_number = ?3",
             params![seq_id, bank_id, seq.sequence_number],
         )
         .map_err(|e| e.to_string())?;
+
+        result.slots_populated += 1;
     }
 
-    // Update library counts
+    // Update library timestamp
     conn.execute(
-        "UPDATE libraries SET patch_count = ?1, sequence_count = ?2, updated_at = CURRENT_TIMESTAMP WHERE id = ?3",
-        params![result.patches_imported, result.sequences_imported, library_id],
+        "UPDATE libraries SET updated_at = CURRENT_TIMESTAMP WHERE id = ?1",
+        params![library_id],
     )
     .map_err(|e| e.to_string())?;
 

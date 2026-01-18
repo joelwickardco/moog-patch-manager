@@ -11,7 +11,13 @@ pub async fn get_all_libraries(state: State<'_, AppState>) -> Result<Vec<Library
     let mut stmt = conn
         .prepare(
             "SELECT l.id, l.name, l.description, l.source_filename, l.color,
-                    l.patch_count, l.sequence_count, l.created_at, l.updated_at
+                    l.created_at, l.updated_at,
+                    (SELECT COUNT(*) FROM bank_patch_slots bps
+                     JOIN banks b ON bps.bank_id = b.id
+                     WHERE b.library_id = l.id AND bps.patch_id IS NOT NULL) as patch_count,
+                    (SELECT COUNT(*) FROM bank_sequence_slots bss
+                     JOIN banks b ON bss.bank_id = b.id
+                     WHERE b.library_id = l.id AND bss.sequence_id IS NOT NULL) as sequence_count
              FROM libraries l
              ORDER BY l.name COLLATE NOCASE",
         )
@@ -25,10 +31,10 @@ pub async fn get_all_libraries(state: State<'_, AppState>) -> Result<Vec<Library
                 description: row.get(2)?,
                 source_filename: row.get(3)?,
                 color: row.get(4)?,
-                patch_count: row.get(5)?,
-                sequence_count: row.get(6)?,
-                created_at: row.get(7)?,
-                updated_at: row.get(8)?,
+                created_at: row.get(5)?,
+                updated_at: row.get(6)?,
+                patch_count: row.get(7)?,
+                sequence_count: row.get(8)?,
             })
         })
         .map_err(|e| e.to_string())?
@@ -44,9 +50,15 @@ pub async fn get_library_by_id(state: State<'_, AppState>, id: i64) -> Result<Li
     let conn = db.conn();
 
     conn.query_row(
-        "SELECT id, name, description, source_filename, color,
-                patch_count, sequence_count, created_at, updated_at
-         FROM libraries WHERE id = ?1",
+        "SELECT l.id, l.name, l.description, l.source_filename, l.color,
+                l.created_at, l.updated_at,
+                (SELECT COUNT(*) FROM bank_patch_slots bps
+                 JOIN banks b ON bps.bank_id = b.id
+                 WHERE b.library_id = l.id AND bps.patch_id IS NOT NULL) as patch_count,
+                (SELECT COUNT(*) FROM bank_sequence_slots bss
+                 JOIN banks b ON bss.bank_id = b.id
+                 WHERE b.library_id = l.id AND bss.sequence_id IS NOT NULL) as sequence_count
+         FROM libraries l WHERE l.id = ?1",
         params![id],
         |row| {
             Ok(LibraryDto {
@@ -55,10 +67,10 @@ pub async fn get_library_by_id(state: State<'_, AppState>, id: i64) -> Result<Li
                 description: row.get(2)?,
                 source_filename: row.get(3)?,
                 color: row.get(4)?,
-                patch_count: row.get(5)?,
-                sequence_count: row.get(6)?,
-                created_at: row.get(7)?,
-                updated_at: row.get(8)?,
+                created_at: row.get(5)?,
+                updated_at: row.get(6)?,
+                patch_count: row.get(7)?,
+                sequence_count: row.get(8)?,
             })
         },
     )
@@ -101,9 +113,15 @@ pub async fn update_library(
     }
 
     conn.query_row(
-        "SELECT id, name, description, source_filename, color,
-                patch_count, sequence_count, created_at, updated_at
-         FROM libraries WHERE id = ?1",
+        "SELECT l.id, l.name, l.description, l.source_filename, l.color,
+                l.created_at, l.updated_at,
+                (SELECT COUNT(*) FROM bank_patch_slots bps
+                 JOIN banks b ON bps.bank_id = b.id
+                 WHERE b.library_id = l.id AND bps.patch_id IS NOT NULL) as patch_count,
+                (SELECT COUNT(*) FROM bank_sequence_slots bss
+                 JOIN banks b ON bss.bank_id = b.id
+                 WHERE b.library_id = l.id AND bss.sequence_id IS NOT NULL) as sequence_count
+         FROM libraries l WHERE l.id = ?1",
         params![id],
         |row| {
             Ok(LibraryDto {
@@ -112,10 +130,10 @@ pub async fn update_library(
                 description: row.get(2)?,
                 source_filename: row.get(3)?,
                 color: row.get(4)?,
-                patch_count: row.get(5)?,
-                sequence_count: row.get(6)?,
-                created_at: row.get(7)?,
-                updated_at: row.get(8)?,
+                created_at: row.get(5)?,
+                updated_at: row.get(6)?,
+                patch_count: row.get(7)?,
+                sequence_count: row.get(8)?,
             })
         },
     )
@@ -127,7 +145,8 @@ pub async fn delete_library(state: State<'_, AppState>, id: i64) -> Result<(), S
     let db = state.db.lock().map_err(|e| e.to_string())?;
     let conn = db.conn();
 
-    // Deleting library will cascade delete all associated patches and sequences
+    // Deleting library will cascade delete banks and bank slots
+    // Patches/sequences remain in global content store (may be referenced by other libraries)
     conn.execute("DELETE FROM libraries WHERE id = ?1", params![id])
         .map_err(|e| e.to_string())?;
 
@@ -173,19 +192,19 @@ pub async fn create_library(state: State<'_, AppState>, name: String) -> Result<
         let bank_id = conn.last_insert_rowid();
 
         // Create 16 empty patch slots
-        for patch_num in 1..=16 {
+        for slot_num in 1..=16 {
             conn.execute(
-                "INSERT INTO bank_patches (bank_id, patch_number, patch_id) VALUES (?1, ?2, NULL)",
-                params![bank_id, patch_num],
+                "INSERT INTO bank_patch_slots (bank_id, slot_number, patch_id) VALUES (?1, ?2, NULL)",
+                params![bank_id, slot_num],
             )
             .map_err(|e| e.to_string())?;
         }
 
         // Create 16 empty sequence slots
-        for seq_num in 1..=16 {
+        for slot_num in 1..=16 {
             conn.execute(
-                "INSERT INTO bank_sequences (bank_id, sequence_number, sequence_id) VALUES (?1, ?2, NULL)",
-                params![bank_id, seq_num],
+                "INSERT INTO bank_sequence_slots (bank_id, slot_number, sequence_id) VALUES (?1, ?2, NULL)",
+                params![bank_id, slot_num],
             )
             .map_err(|e| e.to_string())?;
         }
@@ -193,9 +212,15 @@ pub async fn create_library(state: State<'_, AppState>, name: String) -> Result<
 
     // Return the created library
     conn.query_row(
-        "SELECT id, name, description, source_filename, color,
-                patch_count, sequence_count, created_at, updated_at
-         FROM libraries WHERE id = ?1",
+        "SELECT l.id, l.name, l.description, l.source_filename, l.color,
+                l.created_at, l.updated_at,
+                (SELECT COUNT(*) FROM bank_patch_slots bps
+                 JOIN banks b ON bps.bank_id = b.id
+                 WHERE b.library_id = l.id AND bps.patch_id IS NOT NULL) as patch_count,
+                (SELECT COUNT(*) FROM bank_sequence_slots bss
+                 JOIN banks b ON bss.bank_id = b.id
+                 WHERE b.library_id = l.id AND bss.sequence_id IS NOT NULL) as sequence_count
+         FROM libraries l WHERE l.id = ?1",
         params![library_id],
         |row| {
             Ok(LibraryDto {
@@ -204,10 +229,10 @@ pub async fn create_library(state: State<'_, AppState>, name: String) -> Result<
                 description: row.get(2)?,
                 source_filename: row.get(3)?,
                 color: row.get(4)?,
-                patch_count: row.get(5)?,
-                sequence_count: row.get(6)?,
-                created_at: row.get(7)?,
-                updated_at: row.get(8)?,
+                created_at: row.get(5)?,
+                updated_at: row.get(6)?,
+                patch_count: row.get(7)?,
+                sequence_count: row.get(8)?,
             })
         },
     )

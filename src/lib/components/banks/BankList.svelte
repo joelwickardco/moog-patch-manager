@@ -10,8 +10,8 @@
   }
 
   function getFilledSlotCount(bank) {
-    const patchCount = bank.patches?.filter(p => p !== null).length || 0;
-    const seqCount = bank.sequences?.filter(s => s !== null).length || 0;
+    const patchCount = bank.patch_slots?.filter(s => s.content !== null).length || 0;
+    const seqCount = bank.sequence_slots?.filter(s => s.content !== null).length || 0;
     return { patchCount, seqCount };
   }
 </script>

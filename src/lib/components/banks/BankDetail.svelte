@@ -100,11 +100,12 @@
       <!-- Patches Section -->
       <div>
         <h3 class="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-3">
-          Patches ({bank.patches?.filter(p => p !== null).length || 0}/16)
+          Patches ({bank.patch_slots?.filter(s => s.content !== null).length || 0}/16)
         </h3>
         <div class="grid grid-cols-4 gap-2">
           {#each Array(16) as _, i}
-            {@const patch = bank.patches?.[i] || null}
+            {@const slot = bank.patch_slots?.[i]}
+            {@const patch = slot?.content || null}
             {@const slotNumber = (i + 1).toString().padStart(2, '0')}
             <button
               class="relative p-3 rounded-lg border transition-all text-left
@@ -122,8 +123,8 @@
               <div class="text-xs text-text-secondary mb-1">#{slotNumber}</div>
               {#if patch}
                 <div class="font-medium text-sm truncate">{patch.name}</div>
-                {#if patch.category}
-                  <div class="text-xs text-text-secondary truncate mt-0.5">{patch.category}</div>
+                {#if patch.source_library}
+                  <div class="text-xs text-text-secondary truncate mt-0.5">{patch.source_library}</div>
                 {/if}
               {:else}
                 <div class="text-sm text-text-secondary/50">Empty</div>
@@ -136,11 +137,12 @@
       <!-- Sequences Section -->
       <div>
         <h3 class="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-3">
-          Sequences ({bank.sequences?.filter(s => s !== null).length || 0}/16)
+          Sequences ({bank.sequence_slots?.filter(s => s.content !== null).length || 0}/16)
         </h3>
         <div class="grid grid-cols-4 gap-2">
           {#each Array(16) as _, i}
-            {@const sequence = bank.sequences?.[i] || null}
+            {@const slot = bank.sequence_slots?.[i]}
+            {@const sequence = slot?.content || null}
             {@const slotNumber = (i + 1).toString().padStart(2, '0')}
             <button
               class="relative p-3 rounded-lg border transition-all text-left

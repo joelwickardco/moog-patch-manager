@@ -1,7 +1,7 @@
 <script>
   import BankList from "./BankList.svelte";
   import BankDetail from "./BankDetail.svelte";
-  import { getBanksForLibrary, assignPatchToBank, assignSequenceToBank } from "../../utils/api.js";
+  import { getBanksForLibrary, assignPatchToSlot, assignSequenceToSlot } from "../../utils/api.js";
 
   let {
     selectedLibraryId = null,
@@ -59,8 +59,8 @@
     if (!selectedLibraryId || selectedBankNumber === null) return;
 
     try {
-      // Assign the patch to this slot
-      await assignPatchToBank(selectedLibraryId, selectedBankNumber, slotIndex + 1, patch.id);
+      // Assign the patch to this slot (slot numbers are 1-indexed)
+      await assignPatchToSlot(selectedLibraryId, selectedBankNumber, slotIndex + 1, patch.id);
       showStatus("success", `Assigned "${patch.name}" to slot ${slotIndex + 1}`);
       await loadBanks();
     } catch (e) {
@@ -73,7 +73,7 @@
     if (!selectedLibraryId || selectedBankNumber === null) return;
 
     try {
-      await assignSequenceToBank(selectedLibraryId, selectedBankNumber, slotIndex + 1, sequence.id);
+      await assignSequenceToSlot(selectedLibraryId, selectedBankNumber, slotIndex + 1, sequence.id);
       showStatus("success", `Assigned "${sequence.name}" to slot ${slotIndex + 1}`);
       await loadBanks();
     } catch (e) {

@@ -2,14 +2,20 @@ use serde::{Deserialize, Serialize};
 use super::{PatchDto, SequenceDto};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BankSlotDto<T> {
+    pub slot_number: i32,
+    pub content: Option<T>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BankDto {
     pub id: i64,
     pub library_id: i64,
     pub bank_number: i32,
     pub name: String,
     pub description: Option<String>,
-    pub patches: Vec<Option<PatchDto>>,    // 16 slots
-    pub sequences: Vec<Option<SequenceDto>>, // 16 slots
+    pub patch_slots: Vec<BankSlotDto<PatchDto>>,      // 16 slots
+    pub sequence_slots: Vec<BankSlotDto<SequenceDto>>, // 16 slots
     pub created_at: String,
     pub updated_at: String,
 }
@@ -19,10 +25,11 @@ pub struct ImportResult {
     pub library_id: i64,
     pub library_name: String,
     pub patches_imported: i32,
-    pub patches_skipped: i32,
+    pub patches_reused: i32,
     pub sequences_imported: i32,
-    pub sequences_skipped: i32,
-    pub banks_imported: i32,
+    pub sequences_reused: i32,
+    pub banks_created: i32,
+    pub slots_populated: i32,
     pub errors: Vec<String>,
     pub warnings: Vec<String>,
 }
@@ -33,10 +40,11 @@ impl ImportResult {
             library_id,
             library_name,
             patches_imported: 0,
-            patches_skipped: 0,
+            patches_reused: 0,
             sequences_imported: 0,
-            sequences_skipped: 0,
-            banks_imported: 0,
+            sequences_reused: 0,
+            banks_created: 0,
+            slots_populated: 0,
             errors: Vec::new(),
             warnings: Vec::new(),
         }

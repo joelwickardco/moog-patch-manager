@@ -13,17 +13,17 @@ pub async fn get_all_patches(
 
     let filter = filter.unwrap_or_default();
     let mut sql = String::from(
-        "SELECT p.id, p.library_id, l.name as library_name, p.name, p.file_hash, p.file_size,
-                p.is_favorite, p.notes, p.created_at, p.updated_at
+        "SELECT p.id, p.name, p.file_hash, p.file_size, p.is_favorite, p.notes,
+                p.source_library, p.created_at, p.updated_at,
+                (SELECT COUNT(*) FROM bank_patch_slots WHERE patch_id = p.id) as usage_count
          FROM patches p
-         JOIN libraries l ON p.library_id = l.id
          WHERE 1=1"
     );
     let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
 
-    if let Some(library_id) = filter.library_id {
-        sql.push_str(" AND p.library_id = ?");
-        params_vec.push(Box::new(library_id));
+    if let Some(ref source_library) = filter.source_library {
+        sql.push_str(" AND p.source_library = ?");
+        params_vec.push(Box::new(source_library.clone()));
     }
 
     if let Some(is_fav) = filter.is_favorite {
@@ -45,16 +45,16 @@ pub async fn get_all_patches(
         .query_map(params_refs.as_slice(), |row| {
             Ok(PatchDto {
                 id: row.get(0)?,
-                library_id: row.get(1)?,
-                library_name: row.get(2)?,
-                name: row.get(3)?,
-                file_hash: row.get(4)?,
-                file_size: row.get(5)?,
-                is_favorite: row.get(6)?,
-                notes: row.get(7)?,
+                name: row.get(1)?,
+                file_hash: row.get(2)?,
+                file_size: row.get(3)?,
+                is_favorite: row.get(4)?,
+                notes: row.get(5)?,
+                source_library: row.get(6)?,
                 categories: Vec::new(), // Will be populated below
-                created_at: row.get(8)?,
-                updated_at: row.get(9)?,
+                usage_count: row.get(9)?,
+                created_at: row.get(7)?,
+                updated_at: row.get(8)?,
             })
         })
         .map_err(|e| e.to_string())?;
@@ -83,25 +83,25 @@ pub async fn get_patch_by_id(state: State<'_, AppState>, id: i64) -> Result<Patc
 
     let mut patch: PatchDto = conn
         .query_row(
-            "SELECT p.id, p.library_id, l.name as library_name, p.name, p.file_hash, p.file_size,
-                    p.is_favorite, p.notes, p.created_at, p.updated_at
+            "SELECT p.id, p.name, p.file_hash, p.file_size, p.is_favorite, p.notes,
+                    p.source_library, p.created_at, p.updated_at,
+                    (SELECT COUNT(*) FROM bank_patch_slots WHERE patch_id = p.id) as usage_count
              FROM patches p
-             JOIN libraries l ON p.library_id = l.id
              WHERE p.id = ?1",
             params![id],
             |row| {
                 Ok(PatchDto {
                     id: row.get(0)?,
-                    library_id: row.get(1)?,
-                    library_name: row.get(2)?,
-                    name: row.get(3)?,
-                    file_hash: row.get(4)?,
-                    file_size: row.get(5)?,
-                    is_favorite: row.get(6)?,
-                    notes: row.get(7)?,
+                    name: row.get(1)?,
+                    file_hash: row.get(2)?,
+                    file_size: row.get(3)?,
+                    is_favorite: row.get(4)?,
+                    notes: row.get(5)?,
+                    source_library: row.get(6)?,
                     categories: Vec::new(),
-                    created_at: row.get(8)?,
-                    updated_at: row.get(9)?,
+                    usage_count: row.get(9)?,
+                    created_at: row.get(7)?,
+                    updated_at: row.get(8)?,
                 })
             },
         )
