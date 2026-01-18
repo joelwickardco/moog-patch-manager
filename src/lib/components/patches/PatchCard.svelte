@@ -16,10 +16,22 @@
     // Use category's color if available, otherwise fallback
     return category.color || "#6B7280";
   }
+
+  function handleDragStart(e) {
+    e.dataTransfer.setData("application/json", JSON.stringify({
+      ...patch,
+      sourceType: "library"
+    }));
+    e.dataTransfer.effectAllowed = "copyMove";
+  }
 </script>
 
 {#if listView}
-  <div class="flex items-center gap-4 p-4 bg-surface rounded-lg hover:bg-border/50 transition-colors">
+  <div
+    class="flex items-center gap-4 p-4 bg-surface rounded-lg hover:bg-border/50 transition-colors cursor-grab"
+    draggable="true"
+    ondragstart={handleDragStart}
+  >
     <button
       class="text-2xl {patch.is_favorite ? 'text-favorite' : 'text-text-secondary hover:text-favorite'}"
       onclick={toggleFavorite}
@@ -56,7 +68,11 @@
     </div>
   </div>
 {:else}
-  <div class="bg-surface rounded-lg p-4 hover:bg-border/50 transition-colors">
+  <div
+    class="bg-surface rounded-lg p-4 hover:bg-border/50 transition-colors cursor-grab"
+    draggable="true"
+    ondragstart={handleDragStart}
+  >
     <div class="flex items-start justify-between mb-2">
       <h3 class="font-medium truncate flex-1">{patch.name}</h3>
       <button

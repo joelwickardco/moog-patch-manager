@@ -2,6 +2,7 @@
   import { open, save } from "@tauri-apps/plugin-dialog";
   import Sidebar from "./lib/components/common/Sidebar.svelte";
   import PatchList from "./lib/components/patches/PatchList.svelte";
+  import BanksView from "./lib/components/banks/BanksView.svelte";
   import NewLibraryModal from "./lib/components/common/NewLibraryModal.svelte";
   import { getAllLibraries, importLibraryZip, exportLibrary, createLibrary } from "./lib/utils/api.js";
 
@@ -204,10 +205,7 @@
       {#if activeTab === "library"}
         <PatchList {selectedLibraryId} />
       {:else if activeTab === "banks"}
-        <div class="p-6">
-          <h1 class="text-2xl font-semibold">Banks</h1>
-          <p class="text-text-secondary mt-2">Bank management coming soon...</p>
-        </div>
+        <BanksView {selectedLibraryId} {libraries} />
       {:else if activeTab === "categories"}
         <div class="p-6">
           <h1 class="text-2xl font-semibold">Categories</h1>
