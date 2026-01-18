@@ -177,6 +177,53 @@ pub async fn search_patches(
     .await
 }
 
+#[tauri::command]
+pub async fn get_patches_for_library(
+    state: State<'_, AppState>,
+    library_id: i64,
+) -> Result<Vec<PatchDto>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let conn = db.conn();
+
+    // Get all patches assigned to any bank slot in this library
+    let sql = "SELECT DISTINCT p.id, p.name, p.file_hash, p.file_size, p.is_favorite, p.notes,
+                p.source_library, p.created_at, p.updated_at,
+                (SELECT COUNT(*) FROM bank_patch_slots WHERE patch_id = p.id) as usage_count
+         FROM patches p
+         INNER JOIN bank_patch_slots bps ON p.id = bps.patch_id
+         INNER JOIN banks b ON bps.bank_id = b.id
+         WHERE b.library_id = ?1
+         ORDER BY p.name COLLATE NOCASE";
+
+    let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
+    let patch_rows = stmt
+        .query_map(params![library_id], |row| {
+            Ok(PatchDto {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                file_hash: row.get(2)?,
+                file_size: row.get(3)?,
+                is_favorite: row.get(4)?,
+                notes: row.get(5)?,
+                source_library: row.get(6)?,
+                categories: Vec::new(), // Will be populated below
+                usage_count: row.get(9)?,
+                created_at: row.get(7)?,
+                updated_at: row.get(8)?,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+
+    let mut patches: Vec<PatchDto> = Vec::new();
+    for patch_result in patch_rows {
+        let mut patch = patch_result.map_err(|e| e.to_string())?;
+        patch.categories = get_patch_categories(conn, patch.id)?;
+        patches.push(patch);
+    }
+
+    Ok(patches)
+}
+
 fn get_patch_categories(
     conn: &rusqlite::Connection,
     patch_id: i64,

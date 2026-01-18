@@ -1,7 +1,7 @@
 <script>
   import { toggleFavorite as toggleFavoriteApi } from "../../utils/api.js";
 
-  let { patch, listView = false } = $props();
+  let { patch, listView = false, onCopy = () => {} } = $props();
 
   async function toggleFavorite() {
     try {
@@ -59,6 +59,9 @@
       </div>
     </div>
     <div class="flex gap-2 flex-shrink-0">
+      <button onclick={() => onCopy(patch)} class="p-2 hover:bg-surface rounded" title="Copy">
+        <span class="text-text-secondary">📋</span>
+      </button>
       <button class="p-2 hover:bg-surface rounded" title="Edit">
         <span class="text-text-secondary">✏️</span>
       </button>
@@ -109,6 +112,9 @@
     {/if}
 
     <div class="flex gap-2 mt-3 pt-3 border-t border-border">
+      <button onclick={() => onCopy(patch)} class="flex-1 py-1 text-sm hover:bg-border rounded transition-colors">
+        Copy
+      </button>
       <button class="flex-1 py-1 text-sm hover:bg-border rounded transition-colors">
         Edit
       </button>

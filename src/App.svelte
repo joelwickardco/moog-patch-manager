@@ -203,7 +203,7 @@
 
     <div class="flex-1 overflow-hidden">
       {#if activeTab === "library"}
-        <PatchList {selectedLibraryId} />
+        <PatchList {selectedLibraryId} onLibrariesChanged={loadLibraries} />
       {:else if activeTab === "banks"}
         <BanksView {selectedLibraryId} {libraries} />
       {:else if activeTab === "categories"}

@@ -1,9 +1,10 @@
 <script>
   import PatchCard from "./PatchCard.svelte";
   import SearchBar from "../common/SearchBar.svelte";
-  import { getAllPatches } from "../../utils/api.js";
+  import CopyPatchModal from "./CopyPatchModal.svelte";
+  import { getAllPatches, getPatchesForLibrary, getAllLibraries, assignPatchToSlot } from "../../utils/api.js";
 
-  let { selectedLibraryId = null } = $props();
+  let { selectedLibraryId = null, onLibrariesChanged = () => {} } = $props();
 
   let patches = $state([]);
   let loading = $state(true);
@@ -11,6 +12,12 @@
 
   let searchQuery = $state("");
   let viewMode = $state("grid"); // 'grid' or 'list'
+
+  // Copy modal state
+  let showCopyModal = $state(false);
+  let selectedPatchForCopy = $state(null);
+  let libraries = $state([]);
+  let statusMessage = $state(null);
 
   let filteredPatches = $derived(
     patches.filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -20,10 +27,13 @@
     loading = true;
     error = null;
     try {
-      // Patches are now global - selectedLibraryId is used for filtering by source_library if desired
-      const filter = selectedLibraryId ? { source_library: null } : null;
-      // For now, load all patches (patches are global content store)
-      patches = await getAllPatches(null);
+      if (selectedLibraryId) {
+        // Show only patches assigned to this library's bank slots
+        patches = await getPatchesForLibrary(selectedLibraryId);
+      } else {
+        // Show all patches when no library is selected
+        patches = await getAllPatches(null);
+      }
     } catch (e) {
       error = e.toString();
       patches = [];
@@ -38,6 +48,51 @@
     const libraryId = selectedLibraryId;
     loadPatches();
   });
+
+  // Load libraries on mount
+  $effect(() => {
+    loadLibraries();
+  });
+
+  async function loadLibraries() {
+    try {
+      libraries = await getAllLibraries();
+    } catch (e) {
+      console.error("Failed to load libraries:", e);
+      libraries = [];
+    }
+  }
+
+  function handleCopyClick(patch) {
+    selectedPatchForCopy = patch;
+    showCopyModal = true;
+  }
+
+  async function handleCopySubmit(libraryId, bankNumber, slotNumber) {
+    try {
+      await assignPatchToSlot(libraryId, bankNumber, slotNumber, selectedPatchForCopy.id);
+
+      // Success
+      showCopyModal = false;
+      const patchName = selectedPatchForCopy.name;
+      selectedPatchForCopy = null;
+
+      statusMessage = {
+        type: "success",
+        text: `Copied "${patchName}" to Bank ${bankNumber}, Slot ${slotNumber}`
+      };
+
+      // Auto-dismiss after 5 seconds
+      setTimeout(() => { statusMessage = null; }, 5000);
+
+      // Refresh libraries to update patch counts
+      onLibrariesChanged();
+
+    } catch (e) {
+      console.error("Failed to copy patch:", e);
+      throw e; // Let modal display the error
+    }
+  }
 </script>
 
 <div class="h-full flex flex-col">
@@ -80,15 +135,33 @@
     {:else if viewMode === "grid"}
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {#each filteredPatches as patch (patch.id)}
-          <PatchCard {patch} />
+          <PatchCard {patch} onCopy={handleCopyClick} />
         {/each}
       </div>
     {:else}
       <div class="space-y-2">
         {#each filteredPatches as patch (patch.id)}
-          <PatchCard {patch} listView />
+          <PatchCard {patch} listView onCopy={handleCopyClick} />
         {/each}
       </div>
     {/if}
   </div>
 </div>
+
+<!-- Copy Patch Modal -->
+<CopyPatchModal
+  open={showCopyModal}
+  patch={selectedPatchForCopy}
+  {libraries}
+  onClose={() => { showCopyModal = false; selectedPatchForCopy = null; }}
+  onSubmit={handleCopySubmit}
+/>
+
+<!-- Status Message -->
+{#if statusMessage}
+  <div class="fixed bottom-4 right-4 px-4 py-2 rounded-lg
+              {statusMessage.type === 'success' ? 'bg-green-500' : 'bg-red-500'}
+              text-white shadow-lg z-50">
+    {statusMessage.text}
+  </div>
+{/if}

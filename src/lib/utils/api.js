@@ -26,6 +26,10 @@ export async function getAllPatches(filter = null) {
   return invoke("get_all_patches", { filter });
 }
 
+export async function getPatchesForLibrary(libraryId) {
+  return invoke("get_patches_for_library", { libraryId });
+}
+
 export async function getPatchById(id) {
   return invoke("get_patch_by_id", { id });
 }

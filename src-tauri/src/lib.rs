@@ -40,6 +40,7 @@ pub fn run() {
             commands::libraries::delete_library,
             // Patch commands
             commands::patches::get_all_patches,
+            commands::patches::get_patches_for_library,
             commands::patches::get_patch_by_id,
             commands::patches::toggle_favorite,
             commands::patches::update_patch_notes,
