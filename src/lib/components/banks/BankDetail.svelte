@@ -1,14 +1,63 @@
 <script>
   let {
     bank = null,
+    libraryId = null,
     onPatchSlotClick = () => {},
     onSequenceSlotClick = () => {},
     onPatchSlotDrop = () => {},
-    onSequenceSlotDrop = () => {}
+    onSequenceSlotDrop = () => {},
+    onBankNameUpdate = () => {}
   } = $props();
+
+  import { updateBankName } from "../../utils/api.js";
 
   let dragOverPatchSlot = $state(null);
   let dragOverSequenceSlot = $state(null);
+  let isEditingName = $state(false);
+  let editedName = $state("");
+  let nameInputElement = $state(null);
+
+  function startEditingName() {
+    if (!bank) return;
+    editedName = bank.name;
+    isEditingName = true;
+    // Focus input after it's rendered
+    setTimeout(() => {
+      if (nameInputElement) {
+        nameInputElement.focus();
+        nameInputElement.select();
+      }
+    }, 0);
+  }
+
+  async function saveBankName() {
+    if (!bank || !libraryId || !editedName.trim()) {
+      isEditingName = false;
+      return;
+    }
+
+    try {
+      await updateBankName(libraryId, bank.bank_number, editedName.trim());
+      isEditingName = false;
+      onBankNameUpdate();
+    } catch (e) {
+      console.error("Failed to update bank name:", e);
+      isEditingName = false;
+    }
+  }
+
+  function cancelEdit() {
+    isEditingName = false;
+    editedName = "";
+  }
+
+  function handleNameKeydown(e) {
+    if (e.key === "Enter") {
+      saveBankName();
+    } else if (e.key === "Escape") {
+      cancelEdit();
+    }
+  }
 
   function handlePatchDragOver(e, slotIndex) {
     e.preventDefault();
@@ -89,9 +138,31 @@
   {:else}
     <div class="p-4 border-b border-border bg-surface">
       <div class="flex items-center justify-between">
-        <div>
-          <h2 class="text-lg font-semibold">{bank.name}</h2>
-          <p class="text-sm text-text-secondary">Bank #{bank.bank_number.toString().padStart(2, '0')}</p>
+        <div class="flex-1 mr-4">
+          {#if isEditingName}
+            <input
+              type="text"
+              bind:value={editedName}
+              bind:this={nameInputElement}
+              onkeydown={handleNameKeydown}
+              onblur={saveBankName}
+              class="text-lg font-semibold bg-background border border-primary rounded px-2 py-1 w-full outline-none focus:ring-2 focus:ring-primary/50"
+              placeholder="Bank name"
+            />
+          {:else}
+            <button
+              onclick={startEditingName}
+              class="text-left w-full group"
+            >
+              <h2 class="text-lg font-semibold group-hover:text-primary transition-colors">
+                {bank.name}
+                <span class="ml-2 text-xs text-text-secondary opacity-0 group-hover:opacity-100 transition-opacity">
+                  (click to edit)
+                </span>
+              </h2>
+            </button>
+          {/if}
+          <p class="text-sm text-text-secondary mt-1">Bank #{bank.bank_number.toString().padStart(2, '0')}</p>
         </div>
       </div>
     </div>

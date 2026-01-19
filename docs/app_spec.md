@@ -738,16 +738,18 @@ BanksView (Container)
 - Visual: Scrollable list with active bank highlighting
 
 **BankDetail Component**
-- Props: `bank`, event handlers for slot clicks/drops
+- Props: `bank`, `libraryId`, event handlers for slot clicks/drops, `onBankNameUpdate`
 - Features:
+  - **Inline bank name editing**: Click bank name to edit, save with Enter/blur, cancel with Escape
   - 4x4 grid of 16 patch slots
   - 4x4 grid of 16 sequence slots
   - Drag-and-drop support for patches and sequences
   - Visual feedback for drag-over state
   - Empty slot indicators
+  - Hover hint showing "(click to edit)" on bank name
 - Layout:
   ```
-  Bank 03: "Bass Patches"
+  Bank 03: "Bass Patches" ← (click to edit)
 
   Patches (8/16)
   ┌─────┬─────┬─────┬─────┐
@@ -908,18 +910,25 @@ User Action → System Response
    → BankDetail shows 16 patch slots + 16 sequence slots
 
 3. Edit bank name (optional)
-   → Click name to edit (e.g., "Live Set Bass")
-   → Update bank name in DB
+   → Click on bank name in BankDetail header
+   → Name becomes editable text input
+   → Type new name (e.g., "Live Set Bass")
+   → Press Enter or click away to save
+   → Press Escape to cancel
+   → Backend updates banks table via update_bank_name
+   → Success message shown: "Bank name updated"
+   → Both BankList and BankDetail reflect new name
+   → New name will be used for .bank filename on export
 
 4. Drag patches into slots
    → Drag from library or from other bank slots
    → Drop into target slot
-   → Update bank_patches table
+   → Update bank_patch_slots table
    → Visual feedback during drag/drop
 
 5. Drag sequences into sequence slots
    → Same drag-and-drop workflow for sequences
-   → Update bank_sequences table
+   → Update bank_sequence_slots table
 
 6. Repeat for other banks
    → Select different bank from BankList
@@ -929,6 +938,7 @@ User Action → System Response
    → Show ExportPreview
    → Select output location
    → Generate ZIP with library structure (16 banks)
+   → Each bank exports with <bankname>.bank file
    → Show success with file path
 ```
 
@@ -1537,6 +1547,7 @@ jobs:
 | 1.0 | 2026-01-12 | Initial | Complete application specification |
 | 1.1 | 2026-01-18 | Update | Updated schema to reflect multi-library implementation with library-scoped banks, added Library Management API (section 5.4), updated BanksView/BankList/BankDetail components, added Copy Patch workflow |
 | 1.2 | 2026-01-18 | Update | **Major data model revision**: Patches/sequences are now global content stores (not library-owned). Removed `library_id` from patches/sequences tables. Added `source_library` informational field. Renamed `bank_patches`/`bank_sequences` to `bank_patch_slots`/`bank_sequence_slots` with composite primary keys. Updated API DTOs to reflect new model. This aligns the data model with actual Moog filesystem structure per moog_spec.md section 2.1. |
+| 1.3 | 2026-01-18 | Update | **Added inline bank name editing**: BankDetail component now supports clicking bank name to edit inline. Added keyboard shortcuts (Enter to save, Escape to cancel). Updated BankDetail props to include `libraryId` and `onBankNameUpdate` callback. Updated Workflow 4 to document bank name editing UX. Bank names are persisted via existing `update_bank_name` API command. |
 
 ---
 

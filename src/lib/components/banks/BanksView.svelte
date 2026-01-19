@@ -90,6 +90,11 @@
   function handleSequenceSlotClick(slotIndex, sequence) {
     console.log("Sequence slot clicked:", slotIndex, sequence);
   }
+
+  async function handleBankNameUpdate() {
+    await loadBanks();
+    showStatus("success", "Bank name updated");
+  }
 </script>
 
 <div class="h-full flex flex-col">
@@ -132,10 +137,12 @@
       <div class="flex-1 border-l border-border">
         <BankDetail
           bank={selectedBank}
+          libraryId={selectedLibraryId}
           onPatchSlotClick={handlePatchSlotClick}
           onSequenceSlotClick={handleSequenceSlotClick}
           onPatchSlotDrop={handlePatchSlotDrop}
           onSequenceSlotDrop={handleSequenceSlotDrop}
+          onBankNameUpdate={handleBankNameUpdate}
         />
       </div>
     </div>
