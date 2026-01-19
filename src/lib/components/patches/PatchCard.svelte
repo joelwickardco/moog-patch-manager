@@ -78,12 +78,21 @@
   >
     <div class="flex items-start justify-between mb-2">
       <h3 class="font-medium truncate flex-1">{patch.name}</h3>
-      <button
-        class="text-xl ml-2 {patch.is_favorite ? 'text-favorite' : 'text-text-secondary hover:text-favorite'}"
-        onclick={toggleFavorite}
-      >
-        {patch.is_favorite ? "★" : "☆"}
-      </button>
+      <div class="flex gap-1 ml-2">
+        <button
+          class="text-xl hover:text-primary transition-colors"
+          onclick={() => onCopy(patch)}
+          title="Copy to library"
+        >
+          📋
+        </button>
+        <button
+          class="text-xl {patch.is_favorite ? 'text-favorite' : 'text-text-secondary hover:text-favorite'}"
+          onclick={toggleFavorite}
+        >
+          {patch.is_favorite ? "★" : "☆"}
+        </button>
+      </div>
     </div>
 
     {#if patch.source_library}
@@ -112,9 +121,6 @@
     {/if}
 
     <div class="flex gap-2 mt-3 pt-3 border-t border-border">
-      <button onclick={() => onCopy(patch)} class="flex-1 py-1 text-sm hover:bg-border rounded transition-colors">
-        Copy
-      </button>
       <button class="flex-1 py-1 text-sm hover:bg-border rounded transition-colors">
         Edit
       </button>

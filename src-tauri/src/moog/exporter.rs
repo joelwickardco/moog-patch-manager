@@ -28,8 +28,15 @@ pub struct ExportBank {
 pub fn export_library_structure(
     banks: Vec<ExportBank>,
     output_dir: &Path,
+    library_name: &str,
 ) -> Result<(), String> {
-    let library_dir = output_dir.join("library");
+    // Create root directory with library name
+    let library_root = output_dir.join(sanitize_filename(library_name));
+    fs::create_dir_all(&library_root)
+        .map_err(|e| format!("Failed to create library root directory: {}", e))?;
+
+    // Create library subdirectory inside the library root
+    let library_dir = library_root.join("library");
     fs::create_dir_all(&library_dir)
         .map_err(|e| format!("Failed to create library directory: {}", e))?;
 

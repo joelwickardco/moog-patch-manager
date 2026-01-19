@@ -125,7 +125,7 @@ pub async fn export_library(
     }
 
     // Build the library structure
-    export_library_structure(banks, &temp_dir)?;
+    export_library_structure(banks, &temp_dir, &library_name)?;
 
     // Create ZIP file
     let output = Path::new(&output_path);
