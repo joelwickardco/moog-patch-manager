@@ -1,4 +1,6 @@
 <script>
+  import { updateLibrary } from "../../utils/api.js";
+
   let {
     activeTab = $bindable(),
     libraries = [],
@@ -7,8 +9,14 @@
     importing = false,
     onExport = () => {},
     exporting = false,
-    onNewLibrary = () => {}
+    onNewLibrary = () => {},
+    onLibraryNameUpdate = () => {}
   } = $props();
+
+  let editingLibraryId = $state(null);
+  let editedLibraryName = $state("");
+  let nameInputElement = $state(null);
+  let renameError = $state(null);
 
   const tabs = [
     { id: "library", label: "Library", icon: "folder" },
@@ -23,6 +31,52 @@
 
   function getLibraryColor(library) {
     return library.color || "#6B7280";
+  }
+
+  function startEditingLibraryName(library) {
+    editedLibraryName = library.name;
+    editingLibraryId = library.id;
+    renameError = null;
+    // Focus input after it's rendered
+    setTimeout(() => {
+      if (nameInputElement) {
+        nameInputElement.focus();
+        nameInputElement.select();
+      }
+    }, 0);
+  }
+
+  async function saveLibraryName() {
+    if (!editingLibraryId || !editedLibraryName.trim()) {
+      editingLibraryId = null;
+      renameError = null;
+      return;
+    }
+
+    try {
+      await updateLibrary(editingLibraryId, editedLibraryName.trim());
+      editingLibraryId = null;
+      renameError = null;
+      onLibraryNameUpdate();
+    } catch (e) {
+      // Show error inline instead of canceling
+      renameError = e.toString();
+      // Keep editing mode active so user can fix the name
+    }
+  }
+
+  function cancelLibraryEdit() {
+    editingLibraryId = null;
+    editedLibraryName = "";
+    renameError = null;
+  }
+
+  function handleLibraryNameKeydown(e) {
+    if (e.key === "Enter") {
+      saveLibraryName();
+    } else if (e.key === "Escape") {
+      cancelLibraryEdit();
+    }
   }
 </script>
 
@@ -71,22 +125,57 @@
         </span>
       </button>
       {#each libraries as library}
-        <button
-          class="w-full text-left px-4 py-2 rounded-lg transition-colors flex items-center gap-2
-            {selectedLibraryId === library.id && activeTab === 'library'
-              ? 'bg-primary/20 text-primary'
-              : 'hover:bg-border text-text-secondary'}"
-          onclick={() => selectLibrary(library.id)}
-        >
+        <div class="w-full px-4 py-2 rounded-lg transition-colors flex items-center gap-2 group
+          {selectedLibraryId === library.id && activeTab === 'library'
+            ? 'bg-primary/20 text-primary'
+            : 'hover:bg-border text-text-secondary'}">
+
           <span
             class="w-3 h-3 rounded-full flex-shrink-0"
             style="background-color: {getLibraryColor(library)}"
           ></span>
-          <span class="truncate">{library.name}</span>
+
+          {#if editingLibraryId === library.id}
+            <div class="flex-1 min-w-0 flex flex-col gap-1" onclick={(e) => e.stopPropagation()}>
+              <input
+                type="text"
+                bind:value={editedLibraryName}
+                bind:this={nameInputElement}
+                onkeydown={handleLibraryNameKeydown}
+                onblur={saveLibraryName}
+                class="w-full bg-background border border-primary rounded px-2 py-0.5 text-sm outline-none focus:ring-2 focus:ring-primary/50"
+                placeholder="Library name"
+              />
+              {#if renameError}
+                <div class="text-xs text-red-400">{renameError}</div>
+              {/if}
+            </div>
+          {:else}
+            <button
+              class="min-w-0 flex-1 flex items-center gap-2"
+              onclick={() => selectLibrary(library.id)}
+            >
+              <span class="truncate">{library.name}</span>
+            </button>
+          {/if}
+
           <span class="ml-auto text-xs text-text-secondary flex-shrink-0">
             {library.patch_count}
           </span>
-        </button>
+
+          {#if editingLibraryId !== library.id}
+            <button
+              onclick={(e) => {
+                e.stopPropagation();
+                startEditingLibraryName(library);
+              }}
+              class="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-border rounded flex-shrink-0"
+              title="Rename library"
+            >
+              <span class="text-xs">✏️</span>
+            </button>
+          {/if}
+        </div>
       {/each}
     </div>
 

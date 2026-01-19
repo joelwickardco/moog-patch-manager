@@ -88,7 +88,32 @@ pub async fn update_library(
     let db = state.db.lock().map_err(|e| e.to_string())?;
     let conn = db.conn();
 
-    if let Some(n) = name {
+    if let Some(n) = &name {
+        // Get current name to check if it's actually changing
+        let current_name: String = conn
+            .query_row(
+                "SELECT name FROM libraries WHERE id = ?1",
+                params![id],
+                |row| row.get(0),
+            )
+            .map_err(|e| e.to_string())?;
+
+        // Only validate if the name is actually changing
+        if &current_name != n {
+            // Check if new name already exists (excluding current library)
+            let exists: bool = conn
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM libraries WHERE name = ?1 AND id != ?2)",
+                    params![n, id],
+                    |row| row.get(0),
+                )
+                .map_err(|e| e.to_string())?;
+
+            if exists {
+                return Err(format!("A library named \"{}\" already exists", n));
+            }
+        }
+
         conn.execute(
             "UPDATE libraries SET name = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2",
             params![n, id],

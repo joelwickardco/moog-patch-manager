@@ -188,6 +188,7 @@
     onExport={handleExport}
     {exporting}
     onNewLibrary={() => showNewLibraryModal = true}
+    onLibraryNameUpdate={loadLibraries}
   />
 
   <main class="flex-1 overflow-hidden flex flex-col">
