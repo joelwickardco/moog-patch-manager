@@ -36,8 +36,15 @@ jobs:
         id: find-dmg
         run: |
           DMG_PATH=$(find src-tauri/target/release/bundle/dmg -name "*.dmg" | head -n 1)
-          echo "dmg_path=$DMG_PATH" >> $GITHUB_OUTPUT
-          echo "dmg_name=$(basename $DMG_PATH)" >> $GITHUB_OUTPUT
+          DMG_NAME=$(basename "$DMG_PATH")
+          {
+            echo "dmg_path<<EOF"
+            echo "$DMG_PATH"
+            echo "EOF"
+            echo "dmg_name<<EOF"
+            echo "$DMG_NAME"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
 
       - name: Upload DMG to release
         uses: actions/upload-release-asset@v1
