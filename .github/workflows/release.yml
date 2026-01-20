@@ -7,6 +7,8 @@ on:
 jobs:
   build-dmg:
     runs-on: macos-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout code
@@ -32,26 +34,8 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
-      - name: Find DMG file
-        id: find-dmg
-        run: |
-          DMG_PATH=$(find src-tauri/target/release/bundle/dmg -name "*.dmg" | head -n 1)
-          DMG_NAME=$(basename "$DMG_PATH")
-          {
-            echo "dmg_path<<EOF"
-            echo "$DMG_PATH"
-            echo "EOF"
-            echo "dmg_name<<EOF"
-            echo "$DMG_NAME"
-            echo "EOF"
-          } >> $GITHUB_OUTPUT
-
       - name: Upload DMG to release
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v1
         with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ${{ steps.find-dmg.outputs.dmg_path }}
-          asset_name: ${{ steps.find-dmg.outputs.dmg_name }}
-          asset_content_type: application/x-apple-diskimage
+          files: src-tauri/target/release/bundle/dmg/*.dmg
+          token: ${{ secrets.GITHUB_TOKEN }}
