@@ -46,17 +46,37 @@ The Moog Muse Patch Manager is a cross-platform desktop application that allows 
 
 ### macOS
 
-1. Download the latest `.dmg` file from the releases page
-2. Open the `.dmg` and drag the app to your Applications folder
-3. **Important**: This application is unsigned and will require security approval:
-   - When you first try to open the app, macOS will block it
-   - Go to **System Preferences → Privacy & Security**
-   - Scroll down to find "Moog Muse Manager was blocked from opening"
-   - Click **"Open Anyway"**
-   - Confirm by clicking **"Open"** in the dialog
-4. The app will now launch normally
+**Important**: This application is unsigned and requires special steps to install on macOS.
 
-**Note**: You only need to approve the app once. macOS will remember your choice for future launches.
+#### Installation Steps:
+
+1. Download the latest `.dmg` file from the [releases page](https://github.com/joelwickardco/moog-patch-manager/releases)
+
+2. **Remove the quarantine flag** (required for unsigned apps):
+   - Open Terminal
+   - Run this command (replace the path with your actual download location):
+   ```bash
+   xattr -cr ~/Downloads/Moog\ Muse\ Manager_*.dmg
+   ```
+
+3. Open the `.dmg` file and drag the app to your Applications folder
+
+4. **First launch security approval**:
+   - Right-click (or Control-click) on the app in Applications
+   - Select **"Open"** from the menu
+   - Click **"Open"** in the security dialog
+   - Alternatively, if you try to open normally and it's blocked:
+     - Go to **System Settings → Privacy & Security**
+     - Scroll down to find "Moog Muse Manager was blocked"
+     - Click **"Open Anyway"**
+
+5. The app will now launch normally
+
+**Note**: You only need to do this once. macOS will remember your choice for future launches.
+
+#### Why These Steps Are Needed
+
+This app is not code-signed or notarized with an Apple Developer certificate (which costs $99/year). macOS blocks unsigned apps downloaded from the internet as a security measure. The steps above safely bypass this restriction for apps you trust.
 
 ### Building from Source
 
@@ -127,13 +147,29 @@ The app handles all the complexity of this structure automatically.
 
 ## Troubleshooting
 
-### App won't open on macOS
+### "Damaged" or "Can't be opened" error on macOS
 
-If the app is blocked by macOS security:
-1. Go to **System Preferences → Privacy & Security**
-2. Find the blocked app notification
-3. Click **"Open Anyway"**
-4. Confirm in the dialog
+If you see an error saying the DMG or app is "damaged" or "can't be opened":
+
+**Solution**: Remove the quarantine attribute that macOS adds to downloaded files:
+```bash
+# For the DMG file:
+xattr -cr ~/Downloads/Moog\ Muse\ Manager_*.dmg
+
+# Or for the app itself:
+xattr -cr /Applications/Moog\ Muse\ Manager.app
+```
+
+Then try opening the app again by right-clicking and selecting "Open".
+
+### App blocked by macOS security
+
+If the app is blocked by macOS with an "unidentified developer" warning:
+1. Right-click the app and select **"Open"** (this gives you an override option)
+2. Or go to **System Settings → Privacy & Security**
+3. Find the blocked app notification
+4. Click **"Open Anyway"**
+5. Confirm in the dialog
 
 ### Patches not appearing on Moog Muse
 

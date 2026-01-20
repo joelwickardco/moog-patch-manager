@@ -1,0 +1,53 @@
+MOOG MUSE PATCH MANAGER - macOS Installation Instructions
+=========================================================
+
+This app is unsigned and requires special steps to install on macOS.
+
+INSTALLATION STEPS:
+-------------------
+
+1. Remove the quarantine flag from the downloaded DMG:
+
+   Open Terminal and run:
+
+   xattr -cr ~/Downloads/Moog\ Muse\ Manager_*.dmg
+
+   (Adjust the path if you downloaded to a different location)
+
+2. Open the DMG file and drag the app to your Applications folder
+
+3. First launch:
+
+   - Right-click (or Control-click) on "Moog Muse Manager" in Applications
+   - Select "Open" from the menu
+   - Click "Open" in the security dialog
+
+4. Done! The app will launch normally from now on.
+
+
+WHY IS THIS NEEDED?
+-------------------
+
+This app is not code-signed with an Apple Developer certificate ($99/year).
+macOS blocks unsigned apps downloaded from the internet as a security measure.
+These steps safely bypass that restriction for apps you trust.
+
+
+ALTERNATIVE METHOD:
+-------------------
+
+If you see "damaged" or "can't be opened" errors, you can also remove
+the quarantine from the app itself:
+
+xattr -cr /Applications/Moog\ Muse\ Manager.app
+
+
+TROUBLESHOOTING:
+----------------
+
+If you still have issues:
+1. Make sure you've removed the quarantine flag (step 1)
+2. Try right-clicking the app and selecting "Open" (not double-clicking)
+3. Check System Settings → Privacy & Security for any blocks
+
+For more help, visit: https://github.com/joelwickardco/moog-patch-manager/issues
