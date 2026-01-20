@@ -218,7 +218,10 @@ fn get_bank_patch_slots(
         .prepare(
             "SELECT bps.slot_number, p.id, p.name, p.file_hash, p.file_size, p.is_favorite,
                     p.notes, p.source_library, p.created_at, p.updated_at,
-                    (SELECT COUNT(*) FROM bank_patch_slots WHERE patch_id = p.id) as usage_count
+                    (SELECT COUNT(*) FROM bank_patch_slots WHERE patch_id = p.id) as usage_count,
+                    (SELECT GROUP_CONCAT(t.name, '|||') FROM patch_tags pt
+                     INNER JOIN tags t ON pt.tag_id = t.id
+                     WHERE pt.patch_id = p.id) as tag_names
              FROM bank_patch_slots bps
              LEFT JOIN patches p ON bps.patch_id = p.id
              WHERE bps.bank_id = ?1
@@ -232,6 +235,11 @@ fn get_bank_patch_slots(
             let patch_id: Option<i64> = row.get(1)?;
 
             if patch_id.is_some() {
+                let tag_names_raw: Option<String> = row.get(11)?;
+                let tags = tag_names_raw
+                    .map(|s| s.split("|||").map(|t| t.to_string()).collect())
+                    .unwrap_or_else(Vec::new);
+
                 Ok(Some((
                     slot_number,
                     PatchDto {
@@ -242,8 +250,8 @@ fn get_bank_patch_slots(
                         is_favorite: row.get(5)?,
                         notes: row.get(6)?,
                         source_library: row.get(7)?,
-                        categories: Vec::new(),
                         usage_count: row.get(10)?,
+                        tags,
                         created_at: row.get(8)?,
                         updated_at: row.get(9)?,
                     },
@@ -304,7 +312,6 @@ fn get_bank_sequence_slots(
                         file_size: row.get(4)?,
                         notes: row.get(5)?,
                         source_library: row.get(6)?,
-                        categories: Vec::new(),
                         usage_count: row.get(9)?,
                         created_at: row.get(7)?,
                         updated_at: row.get(8)?,

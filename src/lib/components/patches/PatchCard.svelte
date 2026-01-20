@@ -1,7 +1,7 @@
 <script>
   import { toggleFavorite as toggleFavoriteApi } from "../../utils/api.js";
 
-  let { patch, listView = false, onCopy = () => {} } = $props();
+  let { patch, listView = false, onCopy = () => {}, onEdit = () => {} } = $props();
 
   async function toggleFavorite() {
     try {
@@ -10,11 +10,6 @@
     } catch (e) {
       console.error("Failed to toggle favorite:", e);
     }
-  }
-
-  function getCategoryColor(category) {
-    // Use category's color if available, otherwise fallback
-    return category.color || "#6B7280";
   }
 
   function handleDragStart(e) {
@@ -40,19 +35,16 @@
     </button>
     <div class="flex-1 min-w-0">
       <h3 class="font-medium truncate">{patch.name}</h3>
-      <div class="flex items-center gap-2 mt-1">
+      <div class="flex items-center gap-2 mt-1 flex-wrap">
         {#if patch.source_library}
           <span class="text-xs px-2 py-0.5 rounded bg-secondary/20 text-secondary">
             {patch.source_library}
           </span>
         {/if}
-        {#if patch.categories?.length}
-          {#each patch.categories as category}
-            <span
-              class="text-xs px-2 py-0.5 rounded"
-              style="background-color: {getCategoryColor(category)}20; color: {getCategoryColor(category)}"
-            >
-              {category.name}
+        {#if patch.tags && patch.tags.length > 0}
+          {#each patch.tags as tag}
+            <span class="text-xs px-2 py-0.5 rounded bg-primary/20 text-primary">
+              {tag}
             </span>
           {/each}
         {/if}
@@ -62,7 +54,7 @@
       <button onclick={() => onCopy(patch)} class="p-2 hover:bg-surface rounded" title="Copy">
         <span class="text-text-secondary">📋</span>
       </button>
-      <button class="p-2 hover:bg-surface rounded" title="Edit">
+      <button onclick={() => onEdit(patch)} class="p-2 hover:bg-surface rounded" title="Edit">
         <span class="text-text-secondary">✏️</span>
       </button>
       <button class="p-2 hover:bg-surface rounded" title="Delete">
@@ -103,14 +95,11 @@
       </div>
     {/if}
 
-    {#if patch.categories?.length}
+    {#if patch.tags && patch.tags.length > 0}
       <div class="flex flex-wrap gap-1 mb-2">
-        {#each patch.categories as category}
-          <span
-            class="text-xs px-2 py-0.5 rounded"
-            style="background-color: {getCategoryColor(category)}20; color: {getCategoryColor(category)}"
-          >
-            {category.name}
+        {#each patch.tags as tag}
+          <span class="text-xs px-2 py-0.5 rounded bg-primary/20 text-primary">
+            {tag}
           </span>
         {/each}
       </div>
@@ -121,7 +110,7 @@
     {/if}
 
     <div class="flex gap-2 mt-3 pt-3 border-t border-border">
-      <button class="flex-1 py-1 text-sm hover:bg-border rounded transition-colors">
+      <button onclick={() => onEdit(patch)} class="flex-1 py-1 text-sm hover:bg-border rounded transition-colors">
         Edit
       </button>
       <button class="flex-1 py-1 text-sm hover:bg-border rounded transition-colors text-red-400">

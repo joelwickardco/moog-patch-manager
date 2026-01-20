@@ -6,6 +6,11 @@ use crate::moog::{parse_library, validate_library};
 use crate::utils::{calculate_sha256, extract_zip};
 use crate::AppState;
 
+/// Predefined tags to match against patch and bank names
+const PREDEFINED_TAGS: &[&str] = &[
+    "Pad", "Lead", "Brass", "Split", "String", "Bass", "Keys", "Pluck", "Arp"
+];
+
 /// Extract library name from a ZIP filename
 /// e.g., "Moog Factory Sounds v2.zip" -> "Moog Factory Sounds v2"
 fn extract_library_name(file_path: &Path) -> String {
@@ -47,6 +52,52 @@ fn generate_unique_library_name(conn: &rusqlite::Connection, base_name: &str) ->
     }
 
     Err("Could not generate unique library name".to_string())
+}
+
+/// Find matching tags from predefined tags in a given name (case-insensitive)
+/// Returns the properly cased tag names from the predefined array
+fn find_matching_tags(name: &str) -> Vec<&'static str> {
+    let name_lower = name.to_lowercase();
+    PREDEFINED_TAGS
+        .iter()
+        .filter(|tag| name_lower.contains(&tag.to_lowercase()))
+        .copied()
+        .collect()
+}
+
+/// Add tags to a patch in the database
+/// Creates tags if they don't exist and links them to the patch
+fn add_tags_to_patch(
+    conn: &rusqlite::Connection,
+    patch_id: i64,
+    tags: &[&str],
+) -> Result<(), String> {
+    for tag_name in tags {
+        // Create tag if doesn't exist (case-insensitive unique constraint)
+        conn.execute(
+            "INSERT OR IGNORE INTO tags (name) VALUES (?1)",
+            params![tag_name],
+        )
+        .map_err(|e| e.to_string())?;
+
+        // Get tag ID (case-insensitive lookup)
+        let tag_id: i64 = conn
+            .query_row(
+                "SELECT id FROM tags WHERE name = ?1 COLLATE NOCASE",
+                params![tag_name],
+                |row| row.get(0),
+            )
+            .map_err(|e| e.to_string())?;
+
+        // Link tag to patch (ignore if already linked)
+        conn.execute(
+            "INSERT OR IGNORE INTO patch_tags (patch_id, tag_id) VALUES (?1, ?2)",
+            params![patch_id, tag_id],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
 }
 
 #[tauri::command]
@@ -201,6 +252,31 @@ async fn import_from_directory(
             result.patches_imported += 1;
             conn.last_insert_rowid()
         };
+
+        // Get bank name for tag matching
+        let bank_name: String = conn
+            .query_row(
+                "SELECT name FROM banks WHERE library_id = ?1 AND bank_number = ?2",
+                params![library_id, patch.bank_number],
+                |row| row.get(0),
+            )
+            .unwrap_or_default();
+
+        // Auto-tag based on patch name and bank name
+        let mut matching_tags = find_matching_tags(&patch.name);
+        let bank_tags = find_matching_tags(&bank_name);
+
+        // Combine and deduplicate tags
+        for bank_tag in bank_tags {
+            if !matching_tags.contains(&bank_tag) {
+                matching_tags.push(bank_tag);
+            }
+        }
+
+        // Add tags to patch
+        if !matching_tags.is_empty() {
+            add_tags_to_patch(conn, patch_id, &matching_tags)?;
+        }
 
         // Link to bank slot
         let bank_id: i64 = conn

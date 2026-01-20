@@ -1,6 +1,6 @@
 use rusqlite::params;
 use tauri::State;
-use crate::models::{SequenceDto, SequenceFilter, CategoryDto};
+use crate::models::{SequenceDto, SequenceFilter};
 use crate::AppState;
 
 #[tauri::command]
@@ -45,7 +45,6 @@ pub async fn get_all_sequences(
                 file_size: row.get(3)?,
                 notes: row.get(4)?,
                 source_library: row.get(5)?,
-                categories: Vec::new(),
                 usage_count: row.get(8)?,
                 created_at: row.get(6)?,
                 updated_at: row.get(7)?,
@@ -53,19 +52,9 @@ pub async fn get_all_sequences(
         })
         .map_err(|e| e.to_string())?;
 
-    let mut sequences: Vec<SequenceDto> = Vec::new();
-    for seq_result in sequence_rows {
-        let mut seq = seq_result.map_err(|e| e.to_string())?;
-        seq.categories = get_sequence_categories(conn, seq.id)?;
-        sequences.push(seq);
-    }
-
-    // Filter by category if specified
-    if let Some(category_ids) = filter.category_ids {
-        sequences.retain(|s| {
-            s.categories.iter().any(|c| category_ids.contains(&c.id))
-        });
-    }
+    let sequences: Vec<SequenceDto> = sequence_rows
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
 
     Ok(sequences)
 }
@@ -75,7 +64,7 @@ pub async fn get_sequence_by_id(state: State<'_, AppState>, id: i64) -> Result<S
     let db = state.db.lock().map_err(|e| e.to_string())?;
     let conn = db.conn();
 
-    let mut seq: SequenceDto = conn
+    let seq: SequenceDto = conn
         .query_row(
             "SELECT s.id, s.name, s.file_hash, s.file_size, s.notes, s.source_library,
                     s.created_at, s.updated_at,
@@ -91,7 +80,6 @@ pub async fn get_sequence_by_id(state: State<'_, AppState>, id: i64) -> Result<S
                     file_size: row.get(3)?,
                     notes: row.get(4)?,
                     source_library: row.get(5)?,
-                    categories: Vec::new(),
                     usage_count: row.get(8)?,
                     created_at: row.get(6)?,
                     updated_at: row.get(7)?,
@@ -100,7 +88,6 @@ pub async fn get_sequence_by_id(state: State<'_, AppState>, id: i64) -> Result<S
         )
         .map_err(|e| e.to_string())?;
 
-    seq.categories = get_sequence_categories(conn, seq.id)?;
     Ok(seq)
 }
 
@@ -146,38 +133,4 @@ pub async fn search_sequences(
         }),
     )
     .await
-}
-
-fn get_sequence_categories(
-    conn: &rusqlite::Connection,
-    sequence_id: i64,
-) -> Result<Vec<CategoryDto>, String> {
-    let mut stmt = conn
-        .prepare(
-            "SELECT c.id, c.name, c.description, c.color, c.created_at,
-                    (SELECT COUNT(*) FROM patch_categories WHERE category_id = c.id) as patch_count,
-                    (SELECT COUNT(*) FROM sequence_categories WHERE category_id = c.id) as sequence_count
-             FROM categories c
-             JOIN sequence_categories sc ON c.id = sc.category_id
-             WHERE sc.sequence_id = ?1",
-        )
-        .map_err(|e| e.to_string())?;
-
-    let categories = stmt
-        .query_map(params![sequence_id], |row| {
-            Ok(CategoryDto {
-                id: row.get(0)?,
-                name: row.get(1)?,
-                description: row.get(2)?,
-                color: row.get(3)?,
-                created_at: row.get(4)?,
-                patch_count: row.get(5)?,
-                sequence_count: row.get(6)?,
-            })
-        })
-        .map_err(|e| e.to_string())?
-        .filter_map(|r| r.ok())
-        .collect();
-
-    Ok(categories)
 }

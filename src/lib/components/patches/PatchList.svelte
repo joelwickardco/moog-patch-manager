@@ -1,8 +1,10 @@
 <script>
   import PatchCard from "./PatchCard.svelte";
   import SearchBar from "../common/SearchBar.svelte";
+  import TagInput from "./TagInput.svelte";
   import CopyPatchModal from "./CopyPatchModal.svelte";
-  import { getAllPatches, getPatchesForLibrary, getAllLibraries, assignPatchToSlot } from "../../utils/api.js";
+  import PatchEditModal from "./PatchEditModal.svelte";
+  import { getAllPatches, getPatchesForLibrary, getAllLibraries, assignPatchToSlot, getAllTags } from "../../utils/api.js";
 
   let { selectedLibraryId = null, onLibrariesChanged = () => {} } = $props();
 
@@ -13,11 +15,21 @@
   let searchQuery = $state("");
   let viewMode = $state("grid"); // 'grid' or 'list'
 
+  // Tag filtering state
+  let availableTags = $state([]);
+  let selectedFilterTags = $state([]);
+  let tagFilterMode = $state("any"); // 'any' or 'all'
+  let showFavoritesOnly = $state(false);
+
   // Copy modal state
   let showCopyModal = $state(false);
   let selectedPatchForCopy = $state(null);
   let libraries = $state([]);
   let statusMessage = $state(null);
+
+  // Edit modal state
+  let showEditModal = $state(false);
+  let selectedPatchForEdit = $state(null);
 
   let filteredPatches = $derived(
     patches.filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -31,8 +43,16 @@
         // Show only patches assigned to this library's bank slots
         patches = await getPatchesForLibrary(selectedLibraryId);
       } else {
-        // Show all patches when no library is selected
-        patches = await getAllPatches(null);
+        // Build filter for getAllPatches
+        const filter = {};
+        if (selectedFilterTags.length > 0) {
+          filter.tags = selectedFilterTags;
+          filter.require_all_tags = tagFilterMode === "all";
+        }
+        if (showFavoritesOnly) {
+          filter.is_favorite = true;
+        }
+        patches = await getAllPatches(Object.keys(filter).length > 0 ? filter : null);
       }
     } catch (e) {
       error = e.toString();
@@ -42,16 +62,34 @@
     }
   }
 
-  // Load patches on mount and when selectedLibraryId changes
+  async function loadTags() {
+    try {
+      const tagDtos = await getAllTags();
+      availableTags = tagDtos.map(t => t.name);
+    } catch (e) {
+      console.error("Failed to load tags:", e);
+      availableTags = [];
+    }
+  }
+
+  // Load patches on mount and when selectedLibraryId or tag filter changes
   $effect(() => {
-    // Track the dependency
+    // Track dependencies
     const libraryId = selectedLibraryId;
+    const filterTags = selectedFilterTags;
+    const filterMode = tagFilterMode;
+    const favoritesOnly = showFavoritesOnly;
     loadPatches();
   });
 
   // Load libraries on mount
   $effect(() => {
     loadLibraries();
+  });
+
+  // Load tags on mount
+  $effect(() => {
+    loadTags();
   });
 
   async function loadLibraries() {
@@ -66,6 +104,17 @@
   function handleCopyClick(patch) {
     selectedPatchForCopy = patch;
     showCopyModal = true;
+  }
+
+  function handleEditClick(patch) {
+    selectedPatchForEdit = patch;
+    showEditModal = true;
+  }
+
+  function handleEditSaved() {
+    // Reload tags list and patches to reflect changes
+    loadTags();
+    loadPatches();
   }
 
   async function handleCopySubmit(libraryId, bankNumber, slotNumber) {
@@ -115,6 +164,53 @@
       </div>
     </div>
     <SearchBar bind:value={searchQuery} placeholder="Search patches..." />
+
+    <!-- Favorites Filter -->
+    <div class="mt-3 flex items-center gap-2">
+      <button
+        class="flex items-center gap-1 px-3 py-2 rounded text-sm {showFavoritesOnly ? 'bg-favorite text-white' : 'bg-surface'}"
+        onclick={() => (showFavoritesOnly = !showFavoritesOnly)}
+        title={showFavoritesOnly ? "Show all patches" : "Show favorites only"}
+      >
+        <span>{showFavoritesOnly ? '★' : '☆'}</span>
+        <span>{showFavoritesOnly ? 'Favorites Only' : 'Show All'}</span>
+      </button>
+      {#if showFavoritesOnly}
+        <span class="text-xs text-text-secondary">
+          Showing {filteredPatches.length} favorite{filteredPatches.length !== 1 ? 's' : ''}
+        </span>
+      {/if}
+    </div>
+
+    <!-- Tag Filtering -->
+    {#if !selectedLibraryId}
+      <div class="mt-3">
+        <div class="flex items-center gap-2 mb-2">
+          <label class="text-sm text-text-secondary">Filter by tags:</label>
+          <div class="flex gap-1">
+            <button
+              class="text-xs px-2 py-1 rounded {tagFilterMode === 'any' ? 'bg-primary text-white' : 'bg-surface'}"
+              onclick={() => (tagFilterMode = "any")}
+              title="Show patches with ANY of the selected tags"
+            >
+              Any
+            </button>
+            <button
+              class="text-xs px-2 py-1 rounded {tagFilterMode === 'all' ? 'bg-primary text-white' : 'bg-surface'}"
+              onclick={() => (tagFilterMode = "all")}
+              title="Show patches with ALL of the selected tags"
+            >
+              All
+            </button>
+          </div>
+        </div>
+        <TagInput
+          bind:selectedTags={selectedFilterTags}
+          {availableTags}
+          placeholder="Select tags to filter..."
+        />
+      </div>
+    {/if}
   </header>
 
   <div class="flex-1 overflow-auto p-4">
@@ -135,13 +231,13 @@
     {:else if viewMode === "grid"}
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {#each filteredPatches as patch (patch.id)}
-          <PatchCard {patch} onCopy={handleCopyClick} />
+          <PatchCard {patch} onCopy={handleCopyClick} onEdit={handleEditClick} />
         {/each}
       </div>
     {:else}
       <div class="space-y-2">
         {#each filteredPatches as patch (patch.id)}
-          <PatchCard {patch} listView onCopy={handleCopyClick} />
+          <PatchCard {patch} listView onCopy={handleCopyClick} onEdit={handleEditClick} />
         {/each}
       </div>
     {/if}
@@ -155,6 +251,14 @@
   {libraries}
   onClose={() => { showCopyModal = false; selectedPatchForCopy = null; }}
   onSubmit={handleCopySubmit}
+/>
+
+<!-- Edit Patch Modal -->
+<PatchEditModal
+  open={showEditModal}
+  patch={selectedPatchForEdit}
+  onClose={() => { showEditModal = false; selectedPatchForEdit = null; }}
+  onSaved={handleEditSaved}
 />
 
 <!-- Status Message -->

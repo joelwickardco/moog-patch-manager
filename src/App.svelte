@@ -207,11 +207,6 @@
         <PatchList {selectedLibraryId} onLibrariesChanged={loadLibraries} />
       {:else if activeTab === "banks"}
         <BanksView {selectedLibraryId} {libraries} />
-      {:else if activeTab === "categories"}
-        <div class="p-6">
-          <h1 class="text-2xl font-semibold">Categories</h1>
-          <p class="text-text-secondary mt-2">Category management coming soon...</p>
-        </div>
       {/if}
     </div>
   </main>

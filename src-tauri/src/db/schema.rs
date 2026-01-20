@@ -51,6 +51,24 @@ CREATE TABLE IF NOT EXISTS sequences (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Tags: free-form tags for organizing patches
+CREATE TABLE IF NOT EXISTS tags (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Patch tags: many-to-many relationship between patches and tags
+CREATE TABLE IF NOT EXISTS patch_tags (
+    patch_id INTEGER NOT NULL,
+    tag_id INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (patch_id, tag_id),
+    FOREIGN KEY (patch_id) REFERENCES patches(id) ON DELETE CASCADE,
+    FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
+);
+
 -- Bank patch slots: maps to library/bankXX/patchYY/ directories
 -- Each bank has exactly 16 slots (1-16)
 CREATE TABLE IF NOT EXISTS bank_patch_slots (
@@ -72,33 +90,6 @@ CREATE TABLE IF NOT EXISTS bank_sequence_slots (
     FOREIGN KEY (sequence_id) REFERENCES sequences(id) ON DELETE SET NULL
 );
 
--- Categories: user-defined tags (global, not library-specific)
-CREATE TABLE IF NOT EXISTS categories (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL UNIQUE,
-    description TEXT,
-    color TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
--- Many-to-many: patches can have multiple categories
-CREATE TABLE IF NOT EXISTS patch_categories (
-    patch_id INTEGER NOT NULL,
-    category_id INTEGER NOT NULL,
-    PRIMARY KEY (patch_id, category_id),
-    FOREIGN KEY (patch_id) REFERENCES patches(id) ON DELETE CASCADE,
-    FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
-);
-
--- Many-to-many: sequences can have multiple categories
-CREATE TABLE IF NOT EXISTS sequence_categories (
-    sequence_id INTEGER NOT NULL,
-    category_id INTEGER NOT NULL,
-    PRIMARY KEY (sequence_id, category_id),
-    FOREIGN KEY (sequence_id) REFERENCES sequences(id) ON DELETE CASCADE,
-    FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
-);
-
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_banks_library ON banks(library_id);
 CREATE INDEX IF NOT EXISTS idx_patches_hash ON patches(file_hash);
@@ -108,7 +99,7 @@ CREATE INDEX IF NOT EXISTS idx_sequences_hash ON sequences(file_hash);
 CREATE INDEX IF NOT EXISTS idx_sequences_name ON sequences(name COLLATE NOCASE);
 CREATE INDEX IF NOT EXISTS idx_bank_patch_slots_patch ON bank_patch_slots(patch_id);
 CREATE INDEX IF NOT EXISTS idx_bank_sequence_slots_sequence ON bank_sequence_slots(sequence_id);
-CREATE INDEX IF NOT EXISTS idx_patch_categories_patch ON patch_categories(patch_id);
-CREATE INDEX IF NOT EXISTS idx_patch_categories_category ON patch_categories(category_id);
-CREATE INDEX IF NOT EXISTS idx_sequence_categories_sequence ON sequence_categories(sequence_id);
+CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name COLLATE NOCASE);
+CREATE INDEX IF NOT EXISTS idx_patch_tags_tag ON patch_tags(tag_id);
+CREATE INDEX IF NOT EXISTS idx_patch_tags_patch ON patch_tags(patch_id);
 "#;

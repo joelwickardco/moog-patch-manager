@@ -21,7 +21,6 @@
   const tabs = [
     { id: "library", label: "Library", icon: "folder" },
     { id: "banks", label: "Banks", icon: "bank" },
-    { id: "categories", label: "Categories", icon: "tag" },
   ];
 
   function selectLibrary(libraryId) {

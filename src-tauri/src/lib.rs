@@ -46,21 +46,19 @@ pub fn run() {
             commands::patches::update_patch_notes,
             commands::patches::delete_patch,
             commands::patches::search_patches,
+            // Tag commands
+            commands::patches::get_all_tags,
+            commands::patches::add_tag_to_patch,
+            commands::patches::remove_tag_from_patch,
+            commands::patches::update_patch_tags,
+            commands::patches::get_tag_usage_counts,
+            commands::patches::delete_unused_tags,
             // Sequence commands
             commands::sequences::get_all_sequences,
             commands::sequences::get_sequence_by_id,
             commands::sequences::update_sequence_notes,
             commands::sequences::delete_sequence,
             commands::sequences::search_sequences,
-            // Category commands
-            commands::categories::get_all_categories,
-            commands::categories::create_category,
-            commands::categories::update_category,
-            commands::categories::delete_category,
-            commands::categories::assign_patch_to_category,
-            commands::categories::remove_patch_from_category,
-            commands::categories::assign_sequence_to_category,
-            commands::categories::remove_sequence_from_category,
             // Bank commands
             commands::banks::get_banks_for_library,
             commands::banks::get_bank_by_number,

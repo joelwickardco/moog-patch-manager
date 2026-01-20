@@ -50,6 +50,31 @@ export async function searchPatches(query) {
   return invoke("search_patches", { query });
 }
 
+// Tag operations
+export async function getAllTags() {
+  return invoke("get_all_tags");
+}
+
+export async function addTagToPatch(patchId, tagName) {
+  return invoke("add_tag_to_patch", { patchId, tagName });
+}
+
+export async function removeTagFromPatch(patchId, tagName) {
+  return invoke("remove_tag_from_patch", { patchId, tagName });
+}
+
+export async function updatePatchTags(patchId, tagNames) {
+  return invoke("update_patch_tags", { patchId, tagNames });
+}
+
+export async function getTagUsageCounts() {
+  return invoke("get_tag_usage_counts");
+}
+
+export async function deleteUnusedTags() {
+  return invoke("delete_unused_tags");
+}
+
 // Sequence operations
 export async function getAllSequences(filter = null) {
   return invoke("get_all_sequences", { filter });
@@ -69,39 +94,6 @@ export async function deleteSequence(sequenceId) {
 
 export async function searchSequences(query) {
   return invoke("search_sequences", { query });
-}
-
-// Category operations
-export async function getAllCategories() {
-  return invoke("get_all_categories");
-}
-
-export async function createCategory(name, description = null, color = null) {
-  return invoke("create_category", { name, description, color });
-}
-
-export async function updateCategory(id, name = null, description = null, color = null) {
-  return invoke("update_category", { id, name, description, color });
-}
-
-export async function deleteCategory(id) {
-  return invoke("delete_category", { id });
-}
-
-export async function assignPatchToCategory(patchId, categoryId) {
-  return invoke("assign_patch_to_category", { patchId, categoryId });
-}
-
-export async function removePatchFromCategory(patchId, categoryId) {
-  return invoke("remove_patch_from_category", { patchId, categoryId });
-}
-
-export async function assignSequenceToCategory(sequenceId, categoryId) {
-  return invoke("assign_sequence_to_category", { sequenceId, categoryId });
-}
-
-export async function removeSequenceFromCategory(sequenceId, categoryId) {
-  return invoke("remove_sequence_from_category", { sequenceId, categoryId });
 }
 
 // Bank operations

@@ -8,16 +8,16 @@
 
 ## 1. Executive Summary
 
-The Moog Muse Patch Manager is a desktop application for organizing, categorizing, and managing sound patches and sequences for the Moog Muse synthesizer. The application provides a local database for patch management with features including favorites, user-defined categories, and custom bank organization - capabilities not available in the synthesizer's native filesystem-based organization.
+The Moog Muse Patch Manager is a desktop application for organizing and managing sound patches and sequences for the Moog Muse synthesizer. The application provides a local database for patch management with features including favorites and custom bank organization - capabilities not available in the synthesizer's native filesystem-based organization.
 
 ### Key Features
 - Import patches/sequences from Moog library archives (.zip) or bank directories
-- Organize patches with user-defined categories and favorites
+- Organize patches with favorites
 - Search and filter patch library
 - Build custom bank configurations (16 banks × 16 patches)
 - Export complete library structure for transfer to synthesizer
 - Duplicate detection via file hashing
-- Metadata management (notes, tags, categories)
+- Metadata management (notes, tags)
 
 ### Design Goals
 - Minimal dependencies and small binary size
@@ -38,12 +38,11 @@ The Moog Muse Patch Manager is a desktop application for organizing, categorizin
 ├─────────────────────────────────────────────────────┤
 │  Presentation Layer (Svelte + TailwindCSS)          │
 │  ├── Components (PatchList, BankBuilder, etc.)      │
-│  ├── Stores (patches, categories, banks)            │
+│  ├── Stores (patches, sequences, banks)             │
 │  └── Routes (main view, settings)                   │
 ├─────────────────────────────────────────────────────┤
 │  API Layer (Tauri Commands)                         │
 │  ├── Patch Management                               │
-│  ├── Category Management                            │
 │  ├── Bank Management                                │
 │  ├── Import/Export Operations                       │
 │  └── Search/Filter                                  │
@@ -195,33 +194,6 @@ CREATE TABLE IF NOT EXISTS bank_sequence_slots (
     FOREIGN KEY (sequence_id) REFERENCES sequences(id) ON DELETE SET NULL
 );
 
--- Categories: user-defined tags (global, not library-specific)
-CREATE TABLE IF NOT EXISTS categories (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL UNIQUE,
-    description TEXT,
-    color TEXT,                        -- Hex color for UI (#FF5733)
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
--- Many-to-many: patches can have multiple categories
-CREATE TABLE IF NOT EXISTS patch_categories (
-    patch_id INTEGER NOT NULL,
-    category_id INTEGER NOT NULL,
-    PRIMARY KEY (patch_id, category_id),
-    FOREIGN KEY (patch_id) REFERENCES patches(id) ON DELETE CASCADE,
-    FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
-);
-
--- Many-to-many: sequences can have multiple categories
-CREATE TABLE IF NOT EXISTS sequence_categories (
-    sequence_id INTEGER NOT NULL,
-    category_id INTEGER NOT NULL,
-    PRIMARY KEY (sequence_id, category_id),
-    FOREIGN KEY (sequence_id) REFERENCES sequences(id) ON DELETE CASCADE,
-    FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
-);
-
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_banks_library ON banks(library_id);
 CREATE INDEX IF NOT EXISTS idx_patches_hash ON patches(file_hash);
@@ -231,9 +203,6 @@ CREATE INDEX IF NOT EXISTS idx_sequences_hash ON sequences(file_hash);
 CREATE INDEX IF NOT EXISTS idx_sequences_name ON sequences(name COLLATE NOCASE);
 CREATE INDEX IF NOT EXISTS idx_bank_patch_slots_patch ON bank_patch_slots(patch_id);
 CREATE INDEX IF NOT EXISTS idx_bank_sequence_slots_sequence ON bank_sequence_slots(sequence_id);
-CREATE INDEX IF NOT EXISTS idx_patch_categories_patch ON patch_categories(patch_id);
-CREATE INDEX IF NOT EXISTS idx_patch_categories_category ON patch_categories(category_id);
-CREATE INDEX IF NOT EXISTS idx_sequence_categories_sequence ON sequence_categories(sequence_id);
 ```
 
 ### 4.2 Data Relationships
@@ -256,9 +225,9 @@ CREATE INDEX IF NOT EXISTS idx_sequence_categories_sequence ON sequence_categori
 │                     CONTENT STORE (Global)                      │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  patches ◄─────── patch_categories ───────► categories          │
+│  patches                                                        │
 │                                                                 │
-│  sequences ◄───── sequence_categories ────► categories          │
+│  sequences                                                      │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -279,7 +248,6 @@ library/sequences/bank03/seq01/... → similar pattern for sequences
 - Each library has exactly 16 banks (bank_number 1-16 per library)
 - Each bank has exactly 16 patch slots and 16 sequence slots
 - Slot numbers are 1-16 per bank (enforced by CHECK constraint)
-- Category names must be unique (global)
 - Bank names are user-defined, exported as `<name>.bank` files
 - **Patches/sequences are global**: not owned by libraries, can be referenced by multiple bank slots
 - **Deleting a library**: cascades to banks and slot assignments; patches/sequences remain in global store
@@ -322,7 +290,6 @@ async fn search_patches(query: String) -> Result<Vec<PatchDto>, String>
 ```rust
 struct PatchFilter {
     is_favorite: Option<bool>,
-    category_ids: Option<Vec<i64>>,
     name_contains: Option<String>,
     source_library: Option<String>,    // Filter by original import source
 }
@@ -338,7 +305,6 @@ struct PatchDto {
     is_favorite: bool,
     notes: Option<String>,
     source_library: Option<String>,    // Informational: where it was imported from
-    categories: Vec<CategoryDto>,
     usage_count: i64,                  // Number of bank slots referencing this patch
     created_at: String,
     updated_at: String,
@@ -372,7 +338,6 @@ async fn search_sequences(query: String) -> Result<Vec<SequenceDto>, String>
 **SequenceFilter Structure:**
 ```rust
 struct SequenceFilter {
-    category_ids: Option<Vec<i64>>,
     name_contains: Option<String>,
     source_library: Option<String>,    // Filter by original import source
 }
@@ -387,76 +352,13 @@ struct SequenceDto {
     file_size: i64,
     notes: Option<String>,
     source_library: Option<String>,    // Informational: where it was imported from
-    categories: Vec<CategoryDto>,
     usage_count: i64,                  // Number of bank slots referencing this sequence
     created_at: String,
     updated_at: String,
 }
 ```
 
-### 5.3 Category Management
-
-```rust
-#[tauri::command]
-async fn get_all_categories() -> Result<Vec<CategoryDto>, String>
-
-#[tauri::command]
-async fn create_category(
-    name: String,
-    description: Option<String>,
-    color: Option<String>
-) -> Result<CategoryDto, String>
-
-#[tauri::command]
-async fn update_category(
-    id: i64,
-    name: Option<String>,
-    description: Option<String>,
-    color: Option<String>
-) -> Result<CategoryDto, String>
-
-#[tauri::command]
-async fn delete_category(id: i64) -> Result<(), String>
-
-#[tauri::command]
-async fn assign_patch_to_category(
-    patch_id: i64,
-    category_id: i64
-) -> Result<(), String>
-
-#[tauri::command]
-async fn remove_patch_from_category(
-    patch_id: i64,
-    category_id: i64
-) -> Result<(), String>
-
-#[tauri::command]
-async fn assign_sequence_to_category(
-    sequence_id: i64,
-    category_id: i64
-) -> Result<(), String>
-
-#[tauri::command]
-async fn remove_sequence_from_category(
-    sequence_id: i64,
-    category_id: i64
-) -> Result<(), String>
-```
-
-**CategoryDto Structure:**
-```rust
-struct CategoryDto {
-    id: i64,
-    name: String,
-    description: Option<String>,
-    color: Option<String>,
-    patch_count: i64,
-    sequence_count: i64,
-    created_at: String,
-}
-```
-
-### 5.4 Library Management
+### 5.3 Library Management
 
 ```rust
 #[tauri::command]
@@ -664,19 +566,18 @@ struct ExportPreview {
 ┌─────────────────────────────────────────────────────┐
 │  Moog Muse Patch Manager            [? Help] [⚙️]   │
 ├─────────────────────────────────────────────────────┤
-│  📁 Library  |  🏦 Banks  |  🏷️ Categories          │
+│  📁 Library  |  🏦 Banks                            │
 ├──────────┬──────────────────────────────────────────┤
 │          │  🔍 Search: [__________]  ⭐ ❤️ 🎨       │
 │ Sidebar  │                                          │
 │          │  ┌──────────────────────────────────┐   │
 │ ☆ Fav    │  │  Patch Card                      │   │
 │ 📂 All   │  │  Name: Deep Bass                 │   │
-│          │  │  Categories: Bass, Dark          │   │
-│ Cat:     │  │  [⭐] [❤️] [✏️] [🗑️]             │   │
-│  Bass    │  └──────────────────────────────────┘   │
-│  Lead    │                                          │
-│  Pad     │  [Similar cards in grid layout...]      │
-│  ...     │                                          │
+│          │  │  [⭐] [❤️] [✏️] [🗑️]             │   │
+│          │  └──────────────────────────────────┘   │
+│          │                                          │
+│          │  [Similar cards in grid layout...]      │
+│          │                                          │
 │          │                                          │
 │ [Import] │                                          │
 │ [Export] │                                          │
@@ -712,7 +613,6 @@ let viewMode = 'grid'; // or 'list'
 
 **Features:**
 - Patch name (editable on click)
-- Category badges (colored)
 - Favorite star (toggle)
 - Quick actions menu
 - Notes display (expandable)
@@ -765,16 +665,7 @@ BanksView (Container)
   [Similar 4x4 grid for sequences]
   ```
 
-#### 6.2.4 CategoryManager Component
-**Purpose:** CRUD operations for categories
-
-**Features:**
-- Create new category with color picker
-- Edit existing categories
-- Delete with confirmation
-- View patches per category
-
-#### 6.2.5 ImportDialog Component
+#### 6.2.4 ImportDialog Component
 **Purpose:** Guide user through import process
 
 **Steps:**
@@ -784,7 +675,7 @@ BanksView (Container)
 4. Confirm and execute
 5. Show results
 
-#### 6.2.6 ExportDialog Component
+#### 6.2.5 ExportDialog Component
 **Purpose:** Configure and execute export
 
 **Steps:**
@@ -885,13 +776,8 @@ User Action → System Response
 2. Star favorite patches
    → Toggle favorite flag in DB
    → Update UI immediately
-   
-3. Assign to categories
-   → Open category picker
-   → Multi-select categories
-   → Save associations
-   
-4. Add notes to patch
+
+3. Add notes to patch
    → Click edit icon
    → Open notes editor
    → Save to DB
@@ -953,12 +839,6 @@ accent: '#F7B801',       // Yellow
 
 // Semantic
 favorite: '#FFD700',     // Gold star
-category: {
-  bass: '#8B4513',
-  lead: '#FF6347',
-  pad: '#9370DB',
-  fx: '#20B2AA',
-}
 
 // UI
 background: '#1A1A1A',   // Dark mode primary
@@ -1000,7 +880,6 @@ moog-muse-manager/
 │   │   │   ├── libraries.rs
 │   │   │   ├── patches.rs
 │   │   │   ├── sequences.rs
-│   │   │   ├── categories.rs
 │   │   │   ├── banks.rs
 │   │   │   ├── import.rs
 │   │   │   └── export.rs
@@ -1014,7 +893,6 @@ moog-muse-manager/
 │   │   │   ├── library.rs
 │   │   │   ├── patch.rs
 │   │   │   ├── sequence.rs
-│   │   │   ├── category.rs
 │   │   │   └── bank.rs
 │   │   ├── moog/                   # Moog-specific logic
 │   │   │   ├── mod.rs
@@ -1044,10 +922,6 @@ moog-muse-manager/
 │   │   │   │   ├── BanksView.svelte    # Container component
 │   │   │   │   ├── BankList.svelte     # Left panel - bank selection
 │   │   │   │   └── BankDetail.svelte   # Right panel - slot grid
-│   │   │   ├── categories/
-│   │   │   │   ├── CategoryManager.svelte
-│   │   │   │   ├── CategoryBadge.svelte
-│   │   │   │   └── CategoryPicker.svelte
 │   │   │   ├── import/
 │   │   │   │   ├── ImportDialog.svelte
 │   │   │   │   └── ImportPreview.svelte
@@ -1063,7 +937,6 @@ moog-muse-manager/
 │   │   ├── stores/
 │   │   │   ├── patches.js          # Patch state management
 │   │   │   ├── sequences.js
-│   │   │   ├── categories.js
 │   │   │   ├── banks.js
 │   │   │   └── ui.js               # UI state (modals, etc.)
 │   │   └── utils/
@@ -1108,14 +981,11 @@ moog-muse-manager/
 - ✅ Display patches in list/grid view
 - ✅ Search and filter patches
 - ✅ Mark favorites
-- ✅ Basic category management (CRUD)
-- ✅ Assign patches to categories
 - ✅ Export full library structure
 - ✅ Duplicate detection by hash
 
 **UI:**
 - Simple list/grid of patches
-- Basic forms for categories
 - File picker dialogs
 - Progress indicators
 
@@ -1130,14 +1000,14 @@ moog-muse-manager/
 - ✅ Bank builder UI (assign patches to banks)
 - ✅ Edit patch/sequence metadata (notes)
 - ✅ Batch import from bank directories
-- ✅ Better search (by category, favorites, name)
+- ✅ Better search (by favorites, name)
 - ✅ Sort options (name, date, favorites)
 - ✅ Import validation with preview
 - ✅ Export preview before generation
 
 **UI:**
 - Visual bank builder (16-slot grid)
-- Improved patch cards with categories
+- Improved patch cards
 - Filter sidebar
 - Better modals and dialogs
 
@@ -1150,7 +1020,7 @@ moog-muse-manager/
 
 **Features:**
 - ✅ Drag-and-drop patch organization
-- ✅ Batch operations (delete, categorize, move)
+- ✅ Batch operations (delete, move)
 - ✅ Import/export user preferences
 - ✅ Keyboard shortcuts
 - ✅ Dark/light theme toggle
@@ -1351,16 +1221,9 @@ async fn test_import_library_zip() {
 - [ ] View all patches
 - [ ] Search patches by name
 - [ ] Filter by favorites
-- [ ] Filter by category
 - [ ] Toggle favorite status
 - [ ] Add/edit notes
 - [ ] Delete patch
-
-**Category Management:**
-- [ ] Create category
-- [ ] Edit category
-- [ ] Delete category with patches
-- [ ] Assign patch to multiple categories
 
 **Bank Management:**
 - [ ] View all banks
@@ -1455,7 +1318,7 @@ jobs:
 - Database operations use transactions (ACID)
 - Import validates structure before committing
 - Export verifies structure before writing
-- Auto-save category and bank changes
+- Auto-save bank changes
 - Graceful error handling with user feedback
 
 ### 12.3 Usability
@@ -1512,7 +1375,6 @@ jobs:
 
 **Phase 1 Success:**
 - [ ] Can import/export full library without errors
-- [ ] Can organize patches into categories
 - [ ] Can mark favorites
 - [ ] macOS build installs and runs
 
@@ -1576,16 +1438,6 @@ async function searchPatches(query) {
   });
   
   return patches;
-}
-```
-
-### Assign Category
-```javascript
-async function assignCategory(patchId, categoryId) {
-  await invoke('assign_patch_to_category', {
-    patchId,
-    categoryId
-  });
 }
 ```
 
