@@ -32,7 +32,9 @@
   let selectedPatchForEdit = $state(null);
 
   let filteredPatches = $derived(
-    patches.filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    patches
+      .filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
+      .filter((p) => !showFavoritesOnly || p.is_favorite)
   );
 
   async function loadPatches() {
