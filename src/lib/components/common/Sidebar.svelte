@@ -1,5 +1,6 @@
 <script>
   import { updateLibrary } from "../../utils/api.js";
+  import version from "../../../../version.txt?raw";
 
   let {
     activeTab = $bindable(),
@@ -82,7 +83,9 @@
 <aside class="w-64 bg-surface border-r border-border flex flex-col">
   <div class="p-4 border-b border-border">
     <h1 class="text-xl font-bold text-primary">Moog Muse</h1>
-    <p class="text-sm text-text-secondary">Patch Manager</p>
+    <p class="text-sm text-text-secondary">
+      Patch Manager <span class="text-xs opacity-70">v{version.trim()}</span>
+    </p>
   </div>
 
   <nav class="flex-1 p-2 overflow-y-auto">
