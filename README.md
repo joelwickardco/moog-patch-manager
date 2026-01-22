@@ -2,6 +2,9 @@
 
 A desktop application for managing, organizing, and transferring sound patches for the Moog Muse synthesizer.
 
+<img width="1569" height="977" alt="Screenshot 2026-01-21 at 9 06 35 PM" src="https://github.com/user-attachments/assets/3cb7a0fe-ac5e-460f-9b9a-41937d7a7ec6" />
+
+
 ## Overview
 
 The Moog Muse Patch Manager is a cross-platform desktop application that allows you to manage your Moog Muse patch library on your computer. Import patches from your synthesizer, organize them into banks, and export them back to your device with ease.
