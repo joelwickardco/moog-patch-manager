@@ -254,7 +254,7 @@ muse-patch-manager/
 
 ## License
 
-[Add your license here]
+MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 

@@ -2,7 +2,8 @@
 name = "moog-muse-manager"
 version = "0.1.0"
 description = "Moog Muse Patch Manager"
-authors = ["you"]
+authors = ["Joel Wickard"]
+license = "MIT"
 edition = "2021"
 
 [lib]
