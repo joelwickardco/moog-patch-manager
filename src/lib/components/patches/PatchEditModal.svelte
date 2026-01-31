@@ -68,10 +68,14 @@
 </script>
 
 {#if open && patch}
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onclick={handleCancel}>
+  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" role="presentation" onclick={handleCancel} onkeydown={(e) => e.key === 'Escape' && handleCancel()}>
     <div
       class="bg-background rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-xl"
+      role="dialog"
+      aria-modal="true"
+      tabindex="-1"
       onclick={(e) => e.stopPropagation()}
+      onkeydown={(e) => e.stopPropagation()}
     >
       <div class="p-6">
         <h2 class="text-2xl font-semibold mb-4">Edit Patch</h2>
@@ -79,8 +83,9 @@
         <div class="space-y-4">
           <!-- Patch Name (read-only) -->
           <div>
-            <label class="block text-sm font-medium mb-1">Name</label>
+            <label for="patch-name" class="block text-sm font-medium mb-1">Name</label>
             <input
+              id="patch-name"
               type="text"
               value={patch.name}
               disabled
@@ -90,7 +95,7 @@
 
           <!-- Tags -->
           <div>
-            <label class="block text-sm font-medium mb-1">Tags</label>
+            <div class="block text-sm font-medium mb-1">Tags</div>
             <TagInput
               bind:selectedTags={editedTags}
               {availableTags}
@@ -100,8 +105,9 @@
 
           <!-- Notes -->
           <div>
-            <label class="block text-sm font-medium mb-1">Notes</label>
+            <label for="patch-notes" class="block text-sm font-medium mb-1">Notes</label>
             <textarea
+              id="patch-notes"
               bind:value={editedNotes}
               class="w-full px-3 py-2 bg-surface border border-border rounded-lg resize-none"
               rows="4"
