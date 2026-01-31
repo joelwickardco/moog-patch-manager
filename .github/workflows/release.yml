@@ -106,16 +106,22 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install NSIS
-        run: |
-          choco install nsis -y
-          echo "C:\Program Files (x86)\NSIS" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-
       - name: Install dependencies
         run: npm ci
 
       - name: Build Tauri app
-        run: npm run tauri:build
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: ${{ github.ref_name }}
+          releaseBody: 'See the assets to download and install this version.'
+          releaseDraft: false
+          prerelease: false
+          args: --verbose
+          includeRelease: false
+          includeUpdaterJson: false
 
       - name: Upload Windows installers to release
         uses: softprops/action-gh-release@v1
