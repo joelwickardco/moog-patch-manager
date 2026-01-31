@@ -110,14 +110,13 @@ jobs:
         run: npm ci
 
       - name: Build Tauri app
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          includeUpdaterJson: false
+        run: npm run tauri:build
 
-      - name: Upload INSTALL_WINDOWS.txt to release
+      - name: Upload Windows installers to release
         uses: softprops/action-gh-release@v1
         with:
-          files: INSTALL_WINDOWS.txt
+          files: |
+            src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/nsis/*.exe
+            INSTALL_WINDOWS.txt
           token: ${{ secrets.GITHUB_TOKEN }}
