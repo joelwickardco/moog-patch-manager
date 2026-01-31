@@ -174,7 +174,7 @@
           Patches ({bank.patch_slots?.filter(s => s.content !== null).length || 0}/16)
         </h3>
         <div class="grid grid-cols-4 gap-2">
-          {#each Array(16) as _, i}
+          {#each Array(16).fill(0) as _, i}
             {@const slot = bank.patch_slots?.[i]}
             {@const patch = slot?.content || null}
             {@const slotNumber = (i + 1).toString().padStart(2, '0')}
@@ -211,7 +211,7 @@
           Sequences ({bank.sequence_slots?.filter(s => s.content !== null).length || 0}/16)
         </h3>
         <div class="grid grid-cols-4 gap-2">
-          {#each Array(16) as _, i}
+          {#each Array(16).fill(0) as _, i}
             {@const slot = bank.sequence_slots?.[i]}
             {@const sequence = slot?.content || null}
             {@const slotNumber = (i + 1).toString().padStart(2, '0')}

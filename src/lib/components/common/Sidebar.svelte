@@ -138,7 +138,7 @@
           ></span>
 
           {#if editingLibraryId === library.id}
-            <div class="flex-1 min-w-0 flex flex-col gap-1" onclick={(e) => e.stopPropagation()}>
+            <div class="flex-1 min-w-0 flex flex-col gap-1" role="presentation" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.key === 'Enter' && e.stopPropagation()}>
               <input
                 type="text"
                 bind:value={editedLibraryName}
