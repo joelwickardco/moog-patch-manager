@@ -43,16 +43,16 @@
         "background": "icons/background.png"
       }
     },
-  "windows": {
-    "wix": {
-      "language": "en-US"
-    },
-    "nsis": {
-      "installerIcon": "icons/icon.ico",
-      "installMode": "currentUser",
-      "languages": ["en-US"]
+    "windows": {
+      "wix": {
+        "language": "en-US"
+      },
+      "nsis": {
+        "installerIcon": "icons/icon.ico",
+        "installMode": "currentUser",
+        "languages": ["en-US"]
+      }
     }
-  }
   },
   "plugins": {
     "shell": {
