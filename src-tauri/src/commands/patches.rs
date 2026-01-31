@@ -1,7 +1,7 @@
-use rusqlite::params;
-use tauri::State;
 use crate::models::{PatchDto, PatchFilter, TagDto};
 use crate::AppState;
+use rusqlite::params;
+use tauri::State;
 
 #[tauri::command]
 pub async fn get_all_patches(
@@ -20,7 +20,7 @@ pub async fn get_all_patches(
          FROM patches p
          LEFT JOIN patch_tags pt ON p.id = pt.patch_id
          LEFT JOIN tags t ON pt.tag_id = t.id
-         WHERE 1=1"
+         WHERE 1=1",
     );
     let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
 
@@ -376,9 +376,7 @@ pub async fn update_patch_tags(
     let conn = db.conn();
 
     // Use a transaction for atomicity
-    let tx = conn
-        .unchecked_transaction()
-        .map_err(|e| e.to_string())?;
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
 
     // Remove all existing tags for this patch
     tx.execute(

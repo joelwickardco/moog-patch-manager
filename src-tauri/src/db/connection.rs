@@ -1,6 +1,6 @@
+use super::SCHEMA;
 use rusqlite::{Connection, Result as SqliteResult};
 use std::path::Path;
-use super::SCHEMA;
 
 pub struct Database {
     conn: Connection,

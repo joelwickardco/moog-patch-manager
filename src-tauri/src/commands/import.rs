@@ -1,14 +1,14 @@
-use rusqlite::params;
-use std::path::Path;
-use tauri::State;
 use crate::models::{ImportResult, ValidationResult};
 use crate::moog::{parse_library, validate_library};
 use crate::utils::{calculate_sha256, extract_zip};
 use crate::AppState;
+use rusqlite::params;
+use std::path::Path;
+use tauri::State;
 
 /// Predefined tags to match against patch and bank names
 const PREDEFINED_TAGS: &[&str] = &[
-    "Pad", "Lead", "Brass", "Split", "String", "Bass", "Keys", "Pluck", "Arp"
+    "Pad", "Lead", "Brass", "Split", "String", "Bass", "Keys", "Pluck", "Arp",
 ];
 
 /// Extract library name from a ZIP filename
@@ -22,7 +22,10 @@ fn extract_library_name(file_path: &Path) -> String {
 }
 
 /// Generate a unique library name if the proposed name already exists
-fn generate_unique_library_name(conn: &rusqlite::Connection, base_name: &str) -> Result<String, String> {
+fn generate_unique_library_name(
+    conn: &rusqlite::Connection,
+    base_name: &str,
+) -> Result<String, String> {
     let exists: bool = conn
         .query_row(
             "SELECT EXISTS(SELECT 1 FROM libraries WHERE name = ?1)",
@@ -112,7 +115,8 @@ pub async fn import_library_zip(
 
     // Extract library name from ZIP filename
     let library_name = extract_library_name(path);
-    let source_filename = path.file_name()
+    let source_filename = path
+        .file_name()
         .and_then(|s| s.to_str())
         .map(|s| s.to_string());
 
@@ -192,7 +196,9 @@ async fn import_from_directory(
     // Create 16 banks for this library
     for bank_num in 1..=16 {
         // Check if we have a parsed bank name for this number
-        let bank_name = parsed.banks.iter()
+        let bank_name = parsed
+            .banks
+            .iter()
             .find(|b| b.bank_number == bank_num)
             .map(|b| b.name.clone())
             .unwrap_or_else(|| format!("Bank {:02}", bank_num));

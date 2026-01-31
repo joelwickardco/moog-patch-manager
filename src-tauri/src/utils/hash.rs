@@ -1,4 +1,4 @@
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 
 /// Calculate SHA-256 hash of data, returning a 64-character hex string
 pub fn calculate_sha256(data: &[u8]) -> String {

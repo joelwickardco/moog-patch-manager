@@ -1,5 +1,5 @@
-mod schema;
 mod connection;
+mod schema;
 
 pub use connection::Database;
 pub use schema::SCHEMA;
