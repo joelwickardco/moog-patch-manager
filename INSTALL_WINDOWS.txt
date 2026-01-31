@@ -1,0 +1,108 @@
+MOOG MUSE PATCH MANAGER - WINDOWS INSTALLATION GUIDE
+====================================================
+
+SYSTEM REQUIREMENTS
+-------------------
+- Windows 10 (64-bit) or newer
+- Windows 11 (64-bit)
+- 100 MB free disk space
+
+INSTALLATION OPTIONS
+--------------------
+Two installer types are provided:
+
+1. MSI Installer (Recommended for most users)
+   - Standard Windows Installer package
+   - Can be deployed via Group Policy
+   - File: moog-muse-manager_X.X.X_x64_en-US.msi
+
+2. NSIS Installer (Alternative)
+   - Lightweight, customizable installer
+   - File: moog-muse-manager_X.X.X_x64-setup.exe
+
+Both installers provide the same application. Choose whichever you prefer.
+
+INSTALLATION STEPS
+------------------
+
+1. Download your preferred installer from:
+   https://github.com/joelwickardco/moog-patch-manager/releases
+
+2. Run the installer (double-click the downloaded file)
+
+3. WINDOWS SMARTSCREEN WARNING (EXPECTED):
+
+   You will see a "Windows protected your PC" warning because this
+   application is not code-signed with a Microsoft certificate
+   (signing requires a $400+/year certificate).
+
+   This is NORMAL and SAFE. To proceed:
+
+   a. Click "More info" on the SmartScreen dialog
+   b. Click "Run anyway" at the bottom
+
+   Alternative: Right-click the installer and select "Run as administrator"
+
+4. Follow the installation wizard:
+   - Accept the license agreement
+   - Choose installation location (default is recommended)
+   - Click "Install"
+
+5. Launch the application from:
+   - Start Menu: Search for "Moog Muse Manager"
+   - Desktop shortcut (if created during installation)
+
+UNINSTALLATION
+--------------
+
+Option A - Using Windows Settings:
+1. Open Settings > Apps > Installed apps
+2. Find "Moog Muse Manager"
+3. Click the three dots and select "Uninstall"
+
+Option B - Using Control Panel:
+1. Open Control Panel > Programs > Programs and Features
+2. Find "Moog Muse Manager"
+3. Click "Uninstall"
+
+TROUBLESHOOTING
+---------------
+
+SmartScreen Won't Let Me Run:
+- Ensure you clicked "More info" first, then "Run anyway"
+- Try right-clicking the installer and selecting "Run as administrator"
+- Temporarily disable SmartScreen (not recommended):
+  Settings > Privacy & Security > Windows Security > App & browser control
+
+Installation Blocked by Antivirus:
+Some antivirus software may flag unsigned applications. You may need to:
+1. Temporarily disable your antivirus
+2. Run the installer
+3. Add an exception for "Moog Muse Manager"
+4. Re-enable your antivirus
+
+USB Device Not Detected:
+- Ensure your Moog Muse is connected and powered on
+- Try a different USB port
+- Check Device Manager for USB Mass Storage Device
+- Some USB hubs may cause issues - try connecting directly
+
+Application Won't Start:
+- Ensure you have Windows 10 or newer (64-bit)
+- Run Windows Update to ensure you have the latest system components
+- Try running the application as administrator (right-click > Run as administrator)
+
+FIREWALL NOTICE
+---------------
+The application does not require internet access or make network connections.
+If your firewall prompts you, you can safely deny network access.
+
+PRIVACY
+-------
+This application stores all data locally on your computer. No telemetry or
+analytics are collected. No data is sent to external servers.
+
+SUPPORT
+-------
+For issues and bug reports, visit:
+https://github.com/joelwickardco/moog-patch-manager/issues

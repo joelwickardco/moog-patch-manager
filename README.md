@@ -81,13 +81,43 @@ The Moog Muse Patch Manager is a cross-platform desktop application that allows 
 
 This app is not code-signed or notarized with an Apple Developer certificate (which costs $99/year). macOS blocks unsigned apps downloaded from the internet as a security measure. The steps above safely bypass this restriction for apps you trust.
 
+### Linux
+
+Download the `.deb` package from the [releases page](https://github.com/joelwickardco/moog-patch-manager/releases) and install it:
+
+```bash
+sudo dpkg -i moog-muse-manager_*.deb
+```
+
+If you encounter dependency errors:
+```bash
+sudo apt-get install -f
+```
+
+**Supported distributions**: Ubuntu 22.04+, Debian 11+, or any distribution with webkit2gtk-4.1 support.
+
+See `INSTALL_LINUX.txt` in the release for detailed installation instructions and troubleshooting.
+
+### Windows
+
+Download either the `.msi` or `.exe` installer from the [releases page](https://github.com/joelwickardco/moog-patch-manager/releases) and run it.
+
+**Important**: Windows will show a "Windows protected your PC" SmartScreen warning because this application is not code-signed. This is expected and safe. Click **"More info"** then **"Run anyway"** to proceed with installation.
+
+**Requirements**: Windows 10 (64-bit) or newer.
+
+See `INSTALL_WINDOWS.txt` in the release for detailed installation instructions and troubleshooting.
+
 ### Building from Source
 
 #### Prerequisites
 
 - Node.js 18 or higher
 - Rust 1.70 or higher
-- macOS 12.0 or higher (for macOS builds)
+- Platform-specific dependencies:
+  - **macOS**: macOS 12.0 or higher
+  - **Linux**: webkit2gtk-4.1, build-essential, and other dev libraries
+  - **Windows**: Windows 10 SDK
 
 #### Steps
 
@@ -144,7 +174,19 @@ The app handles all the complexity of this structure automatically.
 
 ## System Requirements
 
+### macOS
 - macOS 12.0 or higher
+- 100 MB free disk space
+- USB port for connecting Moog Muse
+
+### Linux
+- Ubuntu 22.04+ / Debian 11+ (or equivalent)
+- webkit2gtk-4.1 support
+- 100 MB free disk space
+- USB port for connecting Moog Muse
+
+### Windows
+- Windows 10 (64-bit) or newer
 - 100 MB free disk space
 - USB port for connecting Moog Muse
 

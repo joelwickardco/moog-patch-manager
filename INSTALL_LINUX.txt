@@ -1,0 +1,61 @@
+MOOG MUSE PATCH MANAGER - LINUX INSTALLATION GUIDE
+==================================================
+
+SYSTEM REQUIREMENTS
+-------------------
+- Ubuntu 22.04 or newer (or equivalent Debian-based distribution)
+- Debian 11 or newer
+- Other distributions with webkit2gtk-4.1 support
+
+INSTALLATION STEPS
+------------------
+
+1. Download the latest .deb file from:
+   https://github.com/joelwickardco/moog-patch-manager/releases
+
+2. Install the package:
+
+   Option A - Using the terminal:
+   cd ~/Downloads
+   sudo dpkg -i moog-muse-manager_*.deb
+
+   Option B - Using the GUI:
+   Double-click the .deb file and follow the prompts in your
+   software center (Ubuntu Software, GNOME Software, etc.)
+
+3. If you encounter dependency errors, run:
+   sudo apt-get install -f
+
+4. Launch the application:
+   - From your application menu, search for "Moog Muse Manager"
+   - Or run from terminal: moog-muse-manager
+
+UNINSTALLATION
+--------------
+To remove the application:
+sudo apt-get remove moog-muse-manager
+
+TROUBLESHOOTING
+---------------
+
+Missing Dependencies:
+If the installation fails due to missing dependencies, install them manually:
+
+sudo apt-get update
+sudo apt-get install -y \
+  libwebkit2gtk-4.1-0 \
+  libayatana-appindicator3-1 \
+  librsvg2-common
+
+Then try installing the .deb package again.
+
+USB Device Access:
+If you have issues accessing your Moog Muse via USB, you may need to:
+1. Add your user to the plugdev group:
+   sudo usermod -a -G plugdev $USER
+2. Log out and log back in for the change to take effect
+
+SUPPORT
+-------
+For issues and bug reports, visit:
+https://github.com/joelwickardco/moog-patch-manager/issues
