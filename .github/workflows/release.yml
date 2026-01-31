@@ -114,20 +114,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: ${{ github.ref_name }}
-          releaseBody: 'See the assets to download and install this version.'
-          releaseDraft: false
-          prerelease: false
-          args: --verbose
-          includeRelease: false
           includeUpdaterJson: false
 
-      - name: Upload Windows installers to release
+      - name: Upload INSTALL_WINDOWS.txt to release
         uses: softprops/action-gh-release@v1
         with:
-          files: |
-            src-tauri/target/release/bundle/msi/*.msi
-            src-tauri/target/release/bundle/nsis/*.exe
-            INSTALL_WINDOWS.txt
+          files: INSTALL_WINDOWS.txt
           token: ${{ secrets.GITHUB_TOKEN }}
