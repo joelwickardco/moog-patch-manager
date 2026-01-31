@@ -238,7 +238,7 @@ fn get_bank_patch_slots(
                 let tag_names_raw: Option<String> = row.get(11)?;
                 let tags = tag_names_raw
                     .map(|s| s.split("|||").map(|t| t.to_string()).collect())
-                    .unwrap_or_else(Vec::new);
+                    .unwrap_or_default();
 
                 Ok(Some((
                     slot_number,
