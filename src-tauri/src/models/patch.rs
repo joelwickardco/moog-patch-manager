@@ -32,6 +32,7 @@ pub struct PatchFilter {
     pub require_all_tags: Option<bool>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PatchCreate {
     pub name: String,

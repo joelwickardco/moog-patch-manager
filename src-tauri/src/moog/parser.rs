@@ -80,7 +80,9 @@ pub fn parse_library(library_path: &Path) -> Result<ParsedLibrary, String> {
     for bank_num in 1..=16 {
         let bank_dir = library_dir.join(format!("bank{:02}", bank_num));
         if !bank_dir.exists() {
-            result.warnings.push(format!("Missing bank{:02} directory", bank_num));
+            result
+                .warnings
+                .push(format!("Missing bank{:02} directory", bank_num));
             continue;
         }
 
@@ -95,9 +97,10 @@ pub fn parse_library(library_path: &Path) -> Result<ParsedLibrary, String> {
         for patch_num in 1..=16 {
             let patch_dir = bank_dir.join(format!("patch{:02}", patch_num));
             if !patch_dir.exists() {
-                result
-                    .warnings
-                    .push(format!("Missing patch{:02} in bank{:02}", patch_num, bank_num));
+                result.warnings.push(format!(
+                    "Missing patch{:02} in bank{:02}",
+                    patch_num, bank_num
+                ));
                 continue;
             }
 
@@ -147,7 +150,10 @@ fn find_bank_name(bank_dir: &Path, bank_num: i32, warnings: &mut Vec<String>) ->
             .collect();
 
         if bank_files.is_empty() {
-            warnings.push(format!("No .bank file in bank{:02}, using default name", bank_num));
+            warnings.push(format!(
+                "No .bank file in bank{:02}, using default name",
+                bank_num
+            ));
             return default_name;
         }
 

@@ -1,5 +1,5 @@
-mod parser;
 pub mod exporter;
+mod parser;
 mod validator;
 
 pub use parser::parse_library;

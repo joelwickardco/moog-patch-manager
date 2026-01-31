@@ -1,10 +1,10 @@
 use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::Path;
+use walkdir::WalkDir;
 use zip::read::ZipArchive;
 use zip::write::{FileOptions, ZipWriter};
 use zip::CompressionMethod;
-use walkdir::WalkDir;
 
 /// Extract a ZIP file to a destination directory
 pub fn extract_zip(zip_path: &Path, dest_dir: &Path) -> Result<(), String> {
@@ -48,9 +48,7 @@ pub fn create_zip(source_dir: &Path, zip_path: &Path) -> Result<(), String> {
     let mut zip = ZipWriter::new(file);
     let options = FileOptions::default().compression_method(CompressionMethod::Deflated);
 
-    let source_dir_str = source_dir
-        .to_str()
-        .ok_or("Invalid source directory path")?;
+    let source_dir_str = source_dir.to_str().ok_or("Invalid source directory path")?;
 
     for entry in WalkDir::new(source_dir) {
         let entry = entry.map_err(|e| format!("Failed to walk directory: {}", e))?;
