@@ -13,6 +13,7 @@ pub struct LibraryDto {
     pub updated_at: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LibraryCreate {
     pub name: String,

@@ -24,6 +24,7 @@
 {#if listView}
   <div
     class="flex items-center gap-4 p-4 bg-surface rounded-lg hover:bg-border/50 transition-colors cursor-grab"
+    role="listitem"
     draggable="true"
     ondragstart={handleDragStart}
   >
@@ -65,6 +66,7 @@
 {:else}
   <div
     class="bg-surface rounded-lg p-4 hover:bg-border/50 transition-colors cursor-grab"
+    role="article"
     draggable="true"
     ondragstart={handleDragStart}
   >

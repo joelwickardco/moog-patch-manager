@@ -131,12 +131,12 @@
 </script>
 
 {#if open && patch}
-  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div
     class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
     role="dialog"
     aria-modal="true"
     aria-labelledby="modal-title"
+    tabindex="-1"
     onclick={handleBackdropClick}
     onkeydown={handleKeydown}
   >
@@ -155,9 +155,9 @@
         <div class="p-4 space-y-6">
           <!-- Library Selector -->
           <div>
-            <label class="block mb-2">
+            <div class="block mb-2">
               <span class="text-sm text-text-secondary">Select Library</span>
-            </label>
+            </div>
 
             {#if libraries.length === 0}
               <div class="text-sm text-text-secondary p-4 bg-background rounded-lg text-center">
@@ -199,9 +199,9 @@
           <!-- Bank Selector -->
           {#if selectedLibraryId}
             <div>
-              <label class="block mb-2">
+              <div class="block mb-2">
                 <span class="text-sm text-text-secondary">Select Bank</span>
-              </label>
+              </div>
 
               {#if loading}
                 <div class="text-sm text-text-secondary p-4 text-center">
@@ -240,9 +240,9 @@
           <!-- Slot Selector -->
           {#if selectedBank}
             <div>
-              <label class="block mb-2">
+              <div class="block mb-2">
                 <span class="text-sm text-text-secondary">Select Slot</span>
-              </label>
+              </div>
 
               <div class="space-y-3">
                 <!-- Auto mode -->
@@ -283,7 +283,7 @@
                 <!-- Manual slot grid -->
                 {#if slotSelectionMode === "manual"}
                   <div class="grid grid-cols-8 gap-1 mt-2 pl-6">
-                    {#each Array(16) as _, i}
+                    {#each Array(16).fill(0) as _, i}
                       {@const slotNum = i + 1}
                       {@const status = getSlotStatus(selectedBank, slotNum)}
                       <button

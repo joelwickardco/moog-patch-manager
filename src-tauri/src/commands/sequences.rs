@@ -1,7 +1,7 @@
-use rusqlite::params;
-use tauri::State;
 use crate::models::{SequenceDto, SequenceFilter};
 use crate::AppState;
+use rusqlite::params;
+use tauri::State;
 
 #[tauri::command]
 pub async fn get_all_sequences(
@@ -17,7 +17,7 @@ pub async fn get_all_sequences(
                 s.created_at, s.updated_at,
                 (SELECT COUNT(*) FROM bank_sequence_slots WHERE sequence_id = s.id) as usage_count
          FROM sequences s
-         WHERE 1=1"
+         WHERE 1=1",
     );
     let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
 
@@ -60,7 +60,10 @@ pub async fn get_all_sequences(
 }
 
 #[tauri::command]
-pub async fn get_sequence_by_id(state: State<'_, AppState>, id: i64) -> Result<SequenceDto, String> {
+pub async fn get_sequence_by_id(
+    state: State<'_, AppState>,
+    id: i64,
+) -> Result<SequenceDto, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
     let conn = db.conn();
 

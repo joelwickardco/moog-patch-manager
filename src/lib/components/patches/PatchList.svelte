@@ -77,10 +77,10 @@
   // Load patches on mount and when selectedLibraryId or tag filter changes
   $effect(() => {
     // Track dependencies
-    const libraryId = selectedLibraryId;
-    const filterTags = selectedFilterTags;
-    const filterMode = tagFilterMode;
-    const favoritesOnly = showFavoritesOnly;
+    void selectedLibraryId;
+    void selectedFilterTags;
+    void tagFilterMode;
+    void showFavoritesOnly;
     loadPatches();
   });
 
@@ -188,7 +188,7 @@
     {#if !selectedLibraryId}
       <div class="mt-3">
         <div class="flex items-center gap-2 mb-2">
-          <label class="text-sm text-text-secondary">Filter by tags:</label>
+          <span class="text-sm text-text-secondary">Filter by tags:</span>
           <div class="flex gap-1">
             <button
               class="text-xs px-2 py-1 rounded {tagFilterMode === 'any' ? 'bg-primary text-white' : 'bg-surface'}"

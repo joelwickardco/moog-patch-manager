@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use super::{PatchDto, SequenceDto};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BankSlotDto<T> {
@@ -14,7 +14,7 @@ pub struct BankDto {
     pub bank_number: i32,
     pub name: String,
     pub description: Option<String>,
-    pub patch_slots: Vec<BankSlotDto<PatchDto>>,      // 16 slots
+    pub patch_slots: Vec<BankSlotDto<PatchDto>>, // 16 slots
     pub sequence_slots: Vec<BankSlotDto<SequenceDto>>, // 16 slots
     pub created_at: String,
     pub updated_at: String,

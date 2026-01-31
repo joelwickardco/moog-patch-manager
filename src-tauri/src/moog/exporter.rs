@@ -20,7 +20,7 @@ pub struct ExportSequence {
 pub struct ExportBank {
     pub bank_number: i32,
     pub name: String,
-    pub patches: Vec<Option<ExportPatch>>,    // 16 slots
+    pub patches: Vec<Option<ExportPatch>>,      // 16 slots
     pub sequences: Vec<Option<ExportSequence>>, // 16 slots
 }
 
@@ -48,14 +48,17 @@ pub fn export_library_structure(
     for bank in banks {
         // Create bank directory
         let bank_dir = library_dir.join(format!("bank{:02}", bank.bank_number));
-        fs::create_dir_all(&bank_dir)
-            .map_err(|e| format!("Failed to create bank{:02} directory: {}", bank.bank_number, e))?;
+        fs::create_dir_all(&bank_dir).map_err(|e| {
+            format!(
+                "Failed to create bank{:02} directory: {}",
+                bank.bank_number, e
+            )
+        })?;
 
         // Create .bank metadata file
         let bank_file_name = sanitize_filename(&bank.name);
         let bank_file_path = bank_dir.join(format!("{}.bank", bank_file_name));
-        File::create(&bank_file_path)
-            .map_err(|e| format!("Failed to create .bank file: {}", e))?;
+        File::create(&bank_file_path).map_err(|e| format!("Failed to create .bank file: {}", e))?;
 
         // Create patch directories
         for (idx, patch_opt) in bank.patches.iter().enumerate() {

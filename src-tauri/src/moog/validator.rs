@@ -1,6 +1,6 @@
+use crate::models::ValidationResult;
 use std::fs;
 use std::path::Path;
-use crate::models::ValidationResult;
 
 /// Validate a Moog library directory structure
 pub fn validate_library(path: &Path) -> ValidationResult {

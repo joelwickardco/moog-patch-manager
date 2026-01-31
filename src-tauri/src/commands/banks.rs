@@ -1,7 +1,7 @@
-use rusqlite::params;
-use tauri::State;
 use crate::models::{BankDto, BankSlotDto, PatchDto, SequenceDto};
 use crate::AppState;
+use rusqlite::params;
+use tauri::State;
 
 #[tauri::command]
 pub async fn get_banks_for_library(
@@ -66,12 +66,26 @@ pub async fn get_bank_by_number(
     let db = state.db.lock().map_err(|e| e.to_string())?;
     let conn = db.conn();
 
-    let (id, name, description, created_at, updated_at): (i64, String, Option<String>, String, String) =
-        conn.query_row(
+    let (id, name, description, created_at, updated_at): (
+        i64,
+        String,
+        Option<String>,
+        String,
+        String,
+    ) = conn
+        .query_row(
             "SELECT id, name, description, created_at, updated_at
              FROM banks WHERE library_id = ?1 AND bank_number = ?2",
             params![library_id, bank_number],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
+            |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?,
+                    row.get(4)?,
+                ))
+            },
         )
         .map_err(|e| e.to_string())?;
 
@@ -238,7 +252,7 @@ fn get_bank_patch_slots(
                 let tag_names_raw: Option<String> = row.get(11)?;
                 let tags = tag_names_raw
                     .map(|s| s.split("|||").map(|t| t.to_string()).collect())
-                    .unwrap_or_else(Vec::new);
+                    .unwrap_or_default();
 
                 Ok(Some((
                     slot_number,

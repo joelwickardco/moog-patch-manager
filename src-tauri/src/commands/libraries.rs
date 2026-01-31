@@ -1,7 +1,7 @@
-use rusqlite::params;
-use tauri::State;
 use crate::models::LibraryDto;
 use crate::AppState;
+use rusqlite::params;
+use tauri::State;
 
 #[tauri::command]
 pub async fn get_all_libraries(state: State<'_, AppState>) -> Result<Vec<LibraryDto>, String> {
@@ -179,7 +179,10 @@ pub async fn delete_library(state: State<'_, AppState>, id: i64) -> Result<(), S
 }
 
 #[tauri::command]
-pub async fn create_library(state: State<'_, AppState>, name: String) -> Result<LibraryDto, String> {
+pub async fn create_library(
+    state: State<'_, AppState>,
+    name: String,
+) -> Result<LibraryDto, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
     let conn = db.conn();
 
@@ -197,11 +200,8 @@ pub async fn create_library(state: State<'_, AppState>, name: String) -> Result<
     }
 
     // Create the library
-    conn.execute(
-        "INSERT INTO libraries (name) VALUES (?1)",
-        params![name],
-    )
-    .map_err(|e| e.to_string())?;
+    conn.execute("INSERT INTO libraries (name) VALUES (?1)", params![name])
+        .map_err(|e| e.to_string())?;
 
     let library_id = conn.last_insert_rowid();
 
