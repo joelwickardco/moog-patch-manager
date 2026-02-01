@@ -1,6 +1,6 @@
 {
-  "name": "moog-muse-manager",
-  "version": "0.1.0",
+  "name": "muse-patch-manager",
+  "version": "1.0.2",
   "private": true,
   "type": "module",
   "license": "MIT",

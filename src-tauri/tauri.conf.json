@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Moog Muse Manager",
-  "version": "0.1.0",
+  "productName": "Muse Patch Manager",
+  "version": "1.0.2",
   "identifier": "com.moogmuse.manager",
   "build": {
     "beforeDevCommand": "npm run dev",
