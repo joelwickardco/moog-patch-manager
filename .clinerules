@@ -1,0 +1,23 @@
+# Project Documentation Rules
+
+## README Updates
+- Always update README.md when making changes to:
+  - Project structure or architecture
+  - Dependencies or requirements
+  - Setup/installation steps
+  - API endpoints or core functionality
+  - Configuration options
+- Suggest README updates when completing major features or refactors
+
+## docs/app_spec.md Rules
+- Always update docs/app_spec.md when making changes to:
+  - Project strucutre or architecture
+  - Dependencies or requirements
+  - Database or model schemas
+  - Configuration options
+- Suggest docs/app_spec.md updates when completing major features or refactors
+
+## CLAUDE.md
+- Always update CLAUDE.md when making changes to:
+  - Significant architectural or design changes
+- Suggest CLAUDE.md updates when completing major features or refactors
