@@ -4,6 +4,9 @@ A desktop application for managing, organizing, and transferring sound patches f
 
 <img width="1569" height="977" alt="Screenshot 2026-01-21 at 9 06 35 PM" src="https://github.com/user-attachments/assets/3cb7a0fe-ac5e-460f-9b9a-41937d7a7ec6" />
 
+Muse Patch Manager is free to download / use but you can also donate / support my work with:
+
+<a href="https://www.buymeacoffee.com/joelwickard" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/default-orange.png" alt="Buy Me A Coffee" height="41" width="174"></a>
 
 ## Overview
 
