@@ -257,7 +257,14 @@
 
     <div class="flex-1 overflow-hidden">
       {#if activeTab === "library"}
-        <PatchList {selectedLibraryId} onLibrariesChanged={loadLibraries} />
+        <PatchList
+          {selectedLibraryId}
+          onLibrariesChanged={loadLibraries}
+          onImportZip={handleImport}
+          onImportDirectory={handleImportDirectory}
+          onCreateLibrary={() => showNewLibraryModal = true}
+          {importing}
+        />
       {:else if activeTab === "banks"}
         <BanksView {selectedLibraryId} {libraries} />
       {/if}
