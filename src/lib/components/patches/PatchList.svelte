@@ -6,7 +6,15 @@
   import PatchEditModal from "./PatchEditModal.svelte";
   import { getAllPatches, getPatchesForLibrary, getAllLibraries, assignPatchToSlot, getAllTags } from "../../utils/api.js";
 
-  let { selectedLibraryId = null, onLibrariesChanged = () => {} } = $props();
+  let {
+    selectedLibraryId = null,
+    onLibrariesChanged = () => {},
+    // New props for empty state:
+    onImportZip = () => {},
+    onImportDirectory = () => {},
+    onCreateLibrary = () => {},
+    importing = false
+  } = $props();
 
   let patches = $state([]);
   let loading = $state(true);
@@ -226,9 +234,68 @@
         <p class="text-sm mt-2">{error}</p>
       </div>
     {:else if filteredPatches.length === 0}
-      <div class="text-center text-text-secondary py-12">
-        <p class="text-lg">No patches found</p>
-        <p class="text-sm mt-2">Import patches to get started</p>
+      <div class="flex items-center justify-center h-full">
+        <div class="max-w-2xl mx-auto px-8 py-16 text-center">
+          <!-- Welcome Icon -->
+          <div class="text-6xl mb-6">👋</div>
+
+          <!-- Heading -->
+          <h1 class="text-2xl md:text-3xl font-bold text-text-primary mb-4">
+            Welcome to Moog Muse Patch Manager
+          </h1>
+
+          <!-- Subtext -->
+          <p class="text-base text-text-secondary leading-relaxed mb-8">
+            Your patch library is empty. Let's get started organizing your Moog Muse sounds.
+          </p>
+
+          <!-- Divider -->
+          <div class="w-24 h-px bg-border mx-auto mb-8"></div>
+
+          <!-- Getting Started Steps -->
+          <div class="mb-8">
+            <h2 class="text-lg font-semibold text-text-primary mb-4">
+              Getting Started:
+            </h2>
+            <ol class="text-base text-text-secondary leading-relaxed space-y-2 list-decimal list-inside max-w-md mx-auto text-left">
+              <li>Import a library (ZIP file or directory)</li>
+              <li>Browse and organize your patches</li>
+              <li>Create banks with 16 patches each</li>
+              <li>Export to USB for your Moog Muse</li>
+            </ol>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="flex flex-col sm:flex-row justify-center items-center gap-3 sm:gap-4 mb-6">
+            <button
+              class="w-full sm:w-auto px-6 py-3 bg-primary text-white font-medium rounded-lg
+                     hover:bg-primary/90 transition-colors shadow-md hover:shadow-lg
+                     disabled:opacity-50 disabled:cursor-not-allowed"
+              onclick={onImportZip}
+              disabled={importing}
+            >
+              {importing ? 'Importing...' : 'Import ZIP'}
+            </button>
+
+            <button
+              class="w-full sm:w-auto px-6 py-3 bg-surface text-text-primary font-medium rounded-lg
+                     hover:bg-border transition-colors border border-border
+                     disabled:opacity-50 disabled:cursor-not-allowed"
+              onclick={onImportDirectory}
+              disabled={importing}
+            >
+              Import Directory
+            </button>
+
+            <button
+              class="w-full sm:w-auto px-6 py-3 bg-surface text-text-primary font-medium rounded-lg
+                     hover:bg-border transition-colors border border-border"
+              onclick={onCreateLibrary}
+            >
+              Create Empty Library
+            </button>
+          </div>
+        </div>
       </div>
     {:else if viewMode === "grid"}
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
