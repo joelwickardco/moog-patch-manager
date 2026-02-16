@@ -4,7 +4,7 @@
   import PatchList from "./lib/components/patches/PatchList.svelte";
   import BanksView from "./lib/components/banks/BanksView.svelte";
   import NewLibraryModal from "./lib/components/common/NewLibraryModal.svelte";
-  import { getAllLibraries, importLibraryZip, exportLibrary, createLibrary } from "./lib/utils/api.js";
+  import { getAllLibraries, importLibraryZip, importBankDirectory, exportLibrary, createLibrary } from "./lib/utils/api.js";
 
   let activeTab = $state("library");
   let libraries = $state([]);
@@ -48,6 +48,58 @@
 
       // Import the library
       const result = await importLibraryZip(selected);
+
+      // Show success message
+      statusMessage = {
+        type: "success",
+        text: `Imported "${result.library_name}": ${result.patches_imported} patches, ${result.sequences_imported} sequences`
+      };
+
+      // Reload libraries to show the new one
+      await loadLibraries();
+
+      // Select the newly imported library
+      selectedLibraryId = result.library_id;
+      activeTab = "library";
+
+    } catch (e) {
+      console.error("Import failed:", e);
+      statusMessage = {
+        type: "error",
+        text: `Import failed: ${e}`
+      };
+    } finally {
+      importing = false;
+
+      // Clear message after 5 seconds
+      setTimeout(() => {
+        statusMessage = null;
+      }, 5000);
+    }
+  }
+
+  async function handleImportDirectory() {
+    console.log("Import directory button clicked");
+    try {
+      // Open directory picker
+      console.log("Opening directory dialog...");
+      const selected = await open({
+        multiple: false,
+        directory: true
+      });
+      console.log("Directory selected:", selected);
+
+      if (!selected) {
+        // User cancelled
+        console.log("User cancelled directory selection");
+        return;
+      }
+
+      importing = true;
+      statusMessage = null;
+
+      // Import the library from directory
+      const result = await importBankDirectory(selected);
 
       // Show success message
       statusMessage = {
@@ -184,6 +236,7 @@
     {libraries}
     bind:selectedLibraryId
     onImport={handleImport}
+    onImportDirectory={handleImportDirectory}
     {importing}
     onExport={handleExport}
     {exporting}
