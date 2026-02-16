@@ -23,6 +23,16 @@ export default {
         border: "#404040",
         "text-primary": "#FFFFFF",
         "text-secondary": "#B0B0B0",
+        // Patch state colors
+        "state-new": "#10B981",
+        "state-untagged": "#6B7280",
+        "state-multi-use": "#3B82F6",
+        "state-modified": "#F97316",
+      },
+      boxShadow: {
+        // Favorite glow shadows
+        "glow-gold": "0 0 8px rgba(255, 215, 0, 0.3)",
+        "glow-gold-hover": "0 0 12px rgba(255, 215, 0, 0.4)",
       },
     },
   },
