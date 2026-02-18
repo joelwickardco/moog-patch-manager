@@ -20,14 +20,18 @@
   let deleteConfirmTimer = $state(null);
   let deleting = $state(false);
   let removingFromSlot = $state(false);
+  let tagsLoaded = $state(false);
 
   // Track which patch we've loaded form data for
   let loadedPatchId = $state(null);
   let closeButtonEl = $state(null);
 
-  // Load tags on mount
+  // Load tags once when the component is first used
   $effect(() => {
-    loadTags();
+    if (!tagsLoaded) {
+      tagsLoaded = true;
+      loadTags();
+    }
   });
 
   // When patch changes, auto-save previous and load new
