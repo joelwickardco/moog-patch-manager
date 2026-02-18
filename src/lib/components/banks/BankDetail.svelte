@@ -110,17 +110,6 @@
     }
   }
 
-  function handlePatchDragStart(e, patch, slotIndex) {
-    if (!patch) return;
-    e.dataTransfer.setData("application/json", JSON.stringify({
-      ...patch,
-      sourceType: "bank",
-      sourceBankNumber: bank.bank_number,
-      sourceSlotIndex: slotIndex
-    }));
-    e.dataTransfer.effectAllowed = "copyMove";
-  }
-
   function handleSequenceDragStart(e, sequence, slotIndex) {
     if (!sequence) return;
     e.dataTransfer.setData("application/json", JSON.stringify({
