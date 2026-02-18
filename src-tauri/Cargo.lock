@@ -1894,7 +1894,7 @@ dependencies = [
 
 [[package]]
 name = "muse-patch-manager"
-version = "1.0.2"
+version = "1.0.3"
 dependencies = [
  "chrono",
  "rusqlite",
