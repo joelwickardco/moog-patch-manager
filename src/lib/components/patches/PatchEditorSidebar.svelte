@@ -99,8 +99,8 @@
     }
   }
 
-  function handleClose() {
-    saveIfChanged();
+  async function handleClose() {
+    await saveIfChanged();
     onClose();
   }
 
