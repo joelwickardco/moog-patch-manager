@@ -47,6 +47,10 @@
       saveStatus = null;
       removingFromSlot = false;
     } else if (!currentPatch) {
+      // Sidebar closed / patch cleared: auto-save current patch before resetting
+      if (loadedPatchId !== null) {
+        saveIfChanged();
+      }
       loadedPatchId = null;
     }
   });
