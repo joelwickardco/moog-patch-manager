@@ -2,14 +2,17 @@
   let {
     bank = null,
     libraryId = null,
+    selectedPatchId = null,
     onPatchSlotClick = () => {},
     onSequenceSlotClick = () => {},
     onPatchSlotDrop = () => {},
     onSequenceSlotDrop = () => {},
-    onBankNameUpdate = () => {}
+    onBankNameUpdate = () => {},
+    onCopyPatch = () => {}
   } = $props();
 
   import { updateBankName } from "../../utils/api.js";
+  import PatchCard from "../patches/PatchCard.svelte";
 
   let dragOverPatchSlot = $state(null);
   let dragOverSequenceSlot = $state(null);
@@ -178,29 +181,27 @@
             {@const slot = bank.patch_slots?.[i]}
             {@const patch = slot?.content || null}
             {@const slotNumber = (i + 1).toString().padStart(2, '0')}
-            <button
-              class="relative p-3 rounded-lg border transition-all text-left
+            <div
+              class="relative rounded-lg transition-all
                 {patch
-                  ? 'bg-surface border-border hover:border-primary cursor-grab'
-                  : 'bg-background border-border/50 border-dashed'}
-                {dragOverPatchSlot === i ? 'border-primary bg-primary/10' : ''}"
+                  ? dragOverPatchSlot === i ? 'ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg' : ''
+                  : 'bg-background border border-dashed border-border/50 p-3 ' + (dragOverPatchSlot === i ? 'border-primary bg-primary/10' : '')}"
               onclick={() => onPatchSlotClick(i, patch)}
               ondragover={(e) => handlePatchDragOver(e, i)}
               ondragleave={handlePatchDragLeave}
               ondrop={(e) => handlePatchDrop(e, i)}
-              draggable={patch !== null}
-              ondragstart={(e) => handlePatchDragStart(e, patch, i)}
+              role="button"
+              tabindex="0"
+              onkeydown={(e) => e.key === 'Enter' && onPatchSlotClick(i, patch)}
             >
-              <div class="text-xs text-text-secondary mb-1">#{slotNumber}</div>
               {#if patch}
-                <div class="font-medium text-sm truncate">{patch.name}</div>
-                {#if patch.source_library}
-                  <div class="text-xs text-text-secondary truncate mt-0.5">{patch.source_library}</div>
-                {/if}
+                <div class="text-xs text-text-secondary px-1 pt-1 mb-0.5">#{slotNumber}</div>
+                <PatchCard {patch} isSelected={patch && patch.id === selectedPatchId} onCopy={onCopyPatch} onSelect={() => onPatchSlotClick(i, patch)} />
               {:else}
+                <div class="text-xs text-text-secondary mb-1">#{slotNumber}</div>
                 <div class="text-sm text-text-secondary/50">Empty</div>
               {/if}
-            </button>
+            </div>
           {/each}
         </div>
       </div>

@@ -4,7 +4,6 @@
   const version = __APP_VERSION__;
 
   let {
-    activeTab = $bindable(),
     libraries = [],
     selectedLibraryId = $bindable(),
     onImport = () => {},
@@ -22,14 +21,8 @@
   let renameError = $state(null);
   let showImportMenu = $state(false);
 
-  const tabs = [
-    { id: "library", label: "Library", icon: "folder" },
-    { id: "banks", label: "Banks", icon: "bank" },
-  ];
-
   function selectLibrary(libraryId) {
     selectedLibraryId = libraryId;
-    activeTab = "library";
   }
 
   function getLibraryColor(library) {
@@ -107,18 +100,7 @@
   </div>
 
   <nav class="flex-1 p-2 overflow-y-auto">
-    {#each tabs as tab}
-      <button
-        class="w-full text-left px-4 py-3 rounded-lg mb-1 transition-colors {activeTab === tab.id
-          ? 'bg-primary/20 text-primary'
-          : 'hover:bg-border text-text-secondary'}"
-        onclick={() => (activeTab = tab.id)}
-      >
-        {tab.label}
-      </button>
-    {/each}
-
-    <div class="mt-4 pt-4 border-t border-border">
+    <div>
       <div class="flex items-center justify-between px-4 mb-2">
         <h3 class="text-xs font-semibold text-text-secondary uppercase tracking-wider">
           Libraries
@@ -133,7 +115,7 @@
       </div>
       <button
         class="w-full text-left px-4 py-2 rounded-lg transition-colors flex items-center gap-2
-          {selectedLibraryId === null && activeTab === 'library'
+          {selectedLibraryId === null
             ? 'bg-primary/20 text-primary'
             : 'hover:bg-border text-text-secondary'}"
         onclick={() => selectLibrary(null)}
@@ -146,7 +128,7 @@
       </button>
       {#each libraries as library}
         <div class="w-full px-4 py-2 rounded-lg transition-colors flex items-center gap-2 group
-          {selectedLibraryId === library.id && activeTab === 'library'
+          {selectedLibraryId === library.id
             ? 'bg-primary/20 text-primary'
             : 'hover:bg-border text-text-secondary'}">
 
