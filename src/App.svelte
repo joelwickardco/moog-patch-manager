@@ -1,5 +1,6 @@
 <script>
   import { open, save } from "@tauri-apps/plugin-dialog";
+  import UpdateChecker from "./lib/components/common/UpdateChecker.svelte";
   import Sidebar from "./lib/components/common/Sidebar.svelte";
   import PatchList from "./lib/components/patches/PatchList.svelte";
   import BankButtonStrip from "./lib/components/banks/BankButtonStrip.svelte";
@@ -386,3 +387,5 @@
   onClose={() => showNewLibraryModal = false}
   onSubmit={handleCreateLibrary}
 />
+
+<UpdateChecker />
