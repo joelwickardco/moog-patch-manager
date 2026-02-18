@@ -47,6 +47,12 @@
     }
   });
 
+  // Close sidebar when the user switches to a different bank
+  $effect(() => {
+    selectedBankNumber;
+    handleBankSidebarClose();
+  });
+
   async function loadBanks(libraryId) {
     const isLibraryChange = libraryId !== lastLoadedLibraryId;
 
