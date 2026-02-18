@@ -45,7 +45,7 @@
   // Reset state when patch changes (sidebar opens with a new patch)
   $effect(() => {
     const currentPatchId = patch?.id;
-    if (currentPatchId !== undefined) {
+    if (currentPatchId !== undefined && currentPatchId !== null) {
       error = '';
       banks = [];
       selectedBankNumber = 1;
