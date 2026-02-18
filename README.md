@@ -2,7 +2,7 @@
 
 A desktop application for managing, organizing, and transferring sound patches for the Moog Muse synthesizer.
 
-<img width="1569" height="977" alt="Screenshot 2026-01-21 at 9 06 35 PM" src="https://github.com/user-attachments/assets/3cb7a0fe-ac5e-460f-9b9a-41937d7a7ec6" />
+<img width="2560" height="1321" alt="Screenshot 2026-02-17 at 10 25 47 PM" src="https://github.com/user-attachments/assets/26726b94-04dd-4c57-ae9a-2a7191fe8638" />
 
 Muse Patch Manager is free to download / use but you can also donate / support my work with:
 
