@@ -126,6 +126,11 @@
     }
   }
 
+  $effect(() => {
+    return () => {
+      clearDeleteTimer();
+    };
+  });
   async function handleDelete() {
     if (!patch) return;
 
