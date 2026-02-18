@@ -7,7 +7,13 @@
     generatePatchStateAriaLabel
   } from "../../utils/patchStates.js";
 
-  let { patch, listView = false, onCopy = () => {}, onEdit = () => {} } = $props();
+  let {
+    patch,
+    listView = false,
+    isSelected = false,
+    onCopy = () => {},
+    onSelect = () => {}
+  } = $props();
 
   // Derive patch states once for performance
   let isNew = $derived(isNewPatch(patch.created_at));
@@ -15,35 +21,66 @@
   let isUntagged = $derived(!patch.tags || patch.tags.length === 0);
   let hasMultipleUses = $derived(patch.usage_count && patch.usage_count > 1);
 
-  // Container classes based on view mode and favorite status
+  // Container classes based on view mode, favorite status, and selection
   let containerClasses = $derived(
     listView
-      ? getListViewClasses(patch.is_favorite)
-      : getGridViewClasses(patch.is_favorite)
+      ? getListViewClasses(patch.is_favorite, isSelected)
+      : getGridViewClasses(patch.is_favorite, isSelected)
   );
 
-  function getGridViewClasses(isFavorite) {
-    const base = "bg-surface rounded-lg p-4 hover:bg-border/50 transition-colors cursor-grab relative";
-    const favorite = "border-2 border-favorite shadow-glow-gold hover:bg-favorite/5 hover:shadow-glow-gold-hover";
-    const normal = "border-2 border-transparent";
+  function getGridViewClasses(isFavorite, selected) {
+    const base = "bg-surface rounded-lg p-4 hover:bg-border/50 transition-colors cursor-pointer relative";
 
-    return `${base} ${isFavorite ? favorite : normal}`;
+    if (selected && isFavorite) {
+      return `${base} border-2 border-favorite ring-2 ring-favorite/30 shadow-glow-gold shadow-lg`;
+    }
+    if (selected) {
+      return `${base} border-2 border-primary ring-2 ring-primary/30 shadow-lg`;
+    }
+    if (isFavorite) {
+      return `${base} border-2 border-favorite shadow-glow-gold hover:bg-favorite/5 hover:shadow-glow-gold-hover`;
+    }
+    return `${base} border-2 border-transparent`;
   }
 
-  function getListViewClasses(isFavorite) {
-    const base = "flex items-center gap-4 p-4 bg-surface rounded-lg hover:bg-border/50 transition-colors cursor-grab relative";
-    const favorite = "border-2 border-favorite shadow-glow-gold hover:bg-favorite/5";
-    const normal = "border-2 border-transparent";
+  function getListViewClasses(isFavorite, selected) {
+    const base = "flex items-center gap-4 p-4 bg-surface rounded-lg hover:bg-border/50 transition-colors cursor-pointer relative";
 
-    return `${base} ${isFavorite ? favorite : normal}`;
+    if (selected && isFavorite) {
+      return `${base} border-2 border-favorite bg-favorite/5 shadow-glow-gold`;
+    }
+    if (selected) {
+      return `${base} border-2 border-primary bg-primary/5`;
+    }
+    if (isFavorite) {
+      return `${base} border-2 border-favorite shadow-glow-gold hover:bg-favorite/5`;
+    }
+    return `${base} border-2 border-transparent`;
   }
 
-  async function toggleFavorite() {
+  async function toggleFavorite(e) {
+    e.stopPropagation();
     try {
       const newValue = await toggleFavoriteApi(patch.id);
       patch.is_favorite = newValue;
     } catch (e) {
       console.error("Failed to toggle favorite:", e);
+    }
+  }
+
+  function handleCopy(e) {
+    e.stopPropagation();
+    onCopy(patch);
+  }
+
+  function handleCardClick() {
+    onSelect(patch);
+  }
+
+  function handleCardKeydown(e) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onSelect(patch);
     }
   }
 
@@ -59,10 +96,13 @@
 {#if listView}
   <div
     class={containerClasses}
-    role="listitem"
+    tabindex="0"
     aria-label={generatePatchStateAriaLabel(patch)}
+    aria-selected={isSelected}
     draggable="true"
     ondragstart={handleDragStart}
+    onclick={handleCardClick}
+    onkeydown={handleCardKeydown}
   >
     <button
       class="text-2xl {patch.is_favorite ? 'text-favorite' : 'text-text-secondary hover:text-favorite'}"
@@ -113,24 +153,22 @@
       </div>
     </div>
     <div class="flex gap-2 flex-shrink-0">
-      <button onclick={() => onCopy(patch)} class="p-2 hover:bg-surface rounded" title="Copy">
+      <button onclick={handleCopy} class="p-2 hover:bg-surface rounded" title="Copy to library">
         <span class="text-text-secondary">📋</span>
-      </button>
-      <button onclick={() => onEdit(patch)} class="p-2 hover:bg-surface rounded" title="Edit">
-        <span class="text-text-secondary">✏️</span>
-      </button>
-      <button class="p-2 hover:bg-surface rounded" title="Delete">
-        <span class="text-text-secondary">🗑️</span>
       </button>
     </div>
   </div>
 {:else}
   <div
     class={containerClasses}
-    role="article"
+    role="option"
+    tabindex="0"
     aria-label={generatePatchStateAriaLabel(patch)}
+    aria-selected={isSelected}
     draggable="true"
     ondragstart={handleDragStart}
+    onclick={handleCardClick}
+    onkeydown={handleCardKeydown}
   >
     {#if isNew}
       <span
@@ -164,7 +202,7 @@
       <div class="flex gap-1 ml-2">
         <button
           class="text-xl hover:text-primary transition-colors"
-          onclick={() => onCopy(patch)}
+          onclick={handleCopy}
           title="Copy to library"
         >
           📋
@@ -210,13 +248,5 @@
       </span>
     {/if}
 
-    <div class="flex gap-2 mt-3 pt-3 border-t border-border">
-      <button onclick={() => onEdit(patch)} class="flex-1 py-1 text-sm hover:bg-border rounded transition-colors">
-        Edit
-      </button>
-      <button class="flex-1 py-1 text-sm hover:bg-border rounded transition-colors text-red-400">
-        Delete
-      </button>
-    </div>
   </div>
 {/if}
