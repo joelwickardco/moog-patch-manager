@@ -2,11 +2,19 @@
   import PatchCard from "./PatchCard.svelte";
   import SearchBar from "../common/SearchBar.svelte";
   import TagInput from "./TagInput.svelte";
-  import CopyPatchModal from "./CopyPatchModal.svelte";
-  import PatchEditModal from "./PatchEditModal.svelte";
+  import CopyPatchSidebar from "./CopyPatchSidebar.svelte";
+  import PatchEditorSidebar from "./PatchEditorSidebar.svelte";
   import { getAllPatches, getPatchesForLibrary, getAllLibraries, assignPatchToSlot, getAllTags } from "../../utils/api.js";
 
-  let { selectedLibraryId = null, onLibrariesChanged = () => {} } = $props();
+  let {
+    selectedLibraryId = null,
+    onLibrariesChanged = () => {},
+    // New props for empty state:
+    onImportZip = () => {},
+    onImportDirectory = () => {},
+    onCreateLibrary = () => {},
+    importing = false
+  } = $props();
 
   let patches = $state([]);
   let loading = $state(true);
@@ -21,15 +29,18 @@
   let tagFilterMode = $state("any"); // 'any' or 'all'
   let showFavoritesOnly = $state(false);
 
-  // Copy modal state
-  let showCopyModal = $state(false);
+  // Copy sidebar state
   let selectedPatchForCopy = $state(null);
   let libraries = $state([]);
   let statusMessage = $state(null);
 
-  // Edit modal state
-  let showEditModal = $state(false);
-  let selectedPatchForEdit = $state(null);
+  // Sidebar state — null | 'edit' | 'copy'
+  let sidebarMode = $state(null);
+  let selectedPatchId = $state(null);
+
+  let selectedPatchObj = $derived(
+    selectedPatchId ? patches.find(p => p.id === selectedPatchId) || null : null
+  );
 
   let filteredPatches = $derived(
     patches
@@ -105,16 +116,31 @@
 
   function handleCopyClick(patch) {
     selectedPatchForCopy = patch;
-    showCopyModal = true;
+    selectedPatchId = patch.id;
+    sidebarMode = 'copy';
   }
 
-  function handleEditClick(patch) {
-    selectedPatchForEdit = patch;
-    showEditModal = true;
+  function handlePatchSelect(patch) {
+    selectedPatchId = patch.id;
+    selectedPatchForCopy = null;
+    sidebarMode = 'edit';
+  }
+
+  function handleSidebarClose() {
+    selectedPatchId = null;
+    sidebarMode = null;
+    selectedPatchForCopy = null;
+  }
+
+  function handlePatchDeleted() {
+    selectedPatchId = null;
+    sidebarMode = null;
+    selectedPatchForCopy = null;
+    loadPatches();
+    loadTags();
   }
 
   function handleEditSaved() {
-    // Reload tags list and patches to reflect changes
     loadTags();
     loadPatches();
   }
@@ -124,9 +150,10 @@
       await assignPatchToSlot(libraryId, bankNumber, slotNumber, selectedPatchForCopy.id);
 
       // Success
-      showCopyModal = false;
       const patchName = selectedPatchForCopy.name;
+      sidebarMode = null;
       selectedPatchForCopy = null;
+      selectedPatchId = null;
 
       statusMessage = {
         type: "success",
@@ -215,53 +242,143 @@
     {/if}
   </header>
 
-  <div class="flex-1 overflow-auto p-4">
-    {#if loading}
-      <div class="text-center text-text-secondary py-12">
-        <p class="text-lg">Loading patches...</p>
-      </div>
-    {:else if error}
-      <div class="text-center text-red-500 py-12">
-        <p class="text-lg">Error loading patches</p>
-        <p class="text-sm mt-2">{error}</p>
-      </div>
-    {:else if filteredPatches.length === 0}
-      <div class="text-center text-text-secondary py-12">
-        <p class="text-lg">No patches found</p>
-        <p class="text-sm mt-2">Import patches to get started</p>
-      </div>
-    {:else if viewMode === "grid"}
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {#each filteredPatches as patch (patch.id)}
-          <PatchCard {patch} onCopy={handleCopyClick} onEdit={handleEditClick} />
-        {/each}
-      </div>
-    {:else}
-      <div class="space-y-2">
-        {#each filteredPatches as patch (patch.id)}
-          <PatchCard {patch} listView onCopy={handleCopyClick} onEdit={handleEditClick} />
-        {/each}
-      </div>
-    {/if}
+  <div class="flex-1 overflow-hidden flex">
+    <!-- Patch grid area -->
+    <div class="flex-1 overflow-auto p-4">
+      {#if loading}
+        <div class="text-center text-text-secondary py-12">
+          <p class="text-lg">Loading patches...</p>
+        </div>
+      {:else if error}
+        <div class="text-center text-red-500 py-12">
+          <p class="text-lg">Error loading patches</p>
+          <p class="text-sm mt-2">{error}</p>
+        </div>
+      {:else if filteredPatches.length === 0}
+        {#if patches && patches.length === 0}
+          <div class="flex items-center justify-center h-full">
+            <div class="max-w-2xl mx-auto px-8 py-16 text-center">
+              <!-- Welcome Icon -->
+              <div class="text-6xl mb-6">👋</div>
+
+              <!-- Heading -->
+              <h1 class="text-2xl md:text-3xl font-bold text-text-primary mb-4">
+                Welcome to Moog Muse Patch Manager
+              </h1>
+
+              <!-- Subtext -->
+              <p class="text-base text-text-secondary leading-relaxed mb-8">
+                Your patch library is empty. Let's get started organizing your Moog Muse sounds.
+              </p>
+
+              <!-- Divider -->
+              <div class="w-24 h-px bg-border mx-auto mb-8"></div>
+
+              <!-- Getting Started Steps -->
+              <div class="mb-8">
+                <h2 class="text-lg font-semibold text-text-primary mb-4">
+                  Getting Started:
+                </h2>
+                <ol class="text-base text-text-secondary leading-relaxed space-y-2 list-decimal list-inside max-w-md mx-auto text-left">
+                  <li>Import a library (ZIP file or directory)</li>
+                  <li>Browse and organize your patches</li>
+                  <li>Create banks with 16 patches each</li>
+                  <li>Export to USB for your Moog Muse</li>
+                </ol>
+              </div>
+
+              <!-- Action Buttons -->
+              <div class="flex flex-col sm:flex-row justify-center items-center gap-3 sm:gap-4 mb-6">
+                <button
+                  class="w-full sm:w-auto px-6 py-3 bg-primary text-white font-medium rounded-lg
+                         hover:bg-primary/90 transition-colors shadow-md hover:shadow-lg
+                         disabled:opacity-50 disabled:cursor-not-allowed"
+                  onclick={onImportZip}
+                  disabled={importing}
+                >
+                  {importing ? 'Importing...' : 'Import ZIP'}
+                </button>
+
+                <button
+                  class="w-full sm:w-auto px-6 py-3 bg-surface text-text-primary font-medium rounded-lg
+                         hover:bg-border transition-colors border border-border
+                         disabled:opacity-50 disabled:cursor-not-allowed"
+                  onclick={onImportDirectory}
+                  disabled={importing}
+                >
+                  Import Directory
+                </button>
+
+                <button
+                  class="w-full sm:w-auto px-6 py-3 bg-surface text-text-primary font-medium rounded-lg
+                         hover:bg-border transition-colors border border-border"
+                  onclick={onCreateLibrary}
+                >
+                  Create Empty Library
+                </button>
+              </div>
+            </div>
+          </div>
+        {:else}
+          <div class="flex items-center justify-center h-full">
+            <div class="max-w-xl mx-auto px-6 py-12 text-center">
+              <h2 class="text-xl md:text-2xl font-semibold text-text-primary mb-3">
+                No patches match your current search or filters
+              </h2>
+              <p class="text-base text-text-secondary leading-relaxed mb-6">
+                Try clearing your search, turning off favorites-only, or adjusting your tag filters to see more patches.
+              </p>
+            </div>
+          </div>
+        {/if}
+      {:else if viewMode === "grid"}
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {#each filteredPatches as patch (patch.id)}
+            <PatchCard
+              {patch}
+              isSelected={selectedPatchId === patch.id}
+              onSelect={handlePatchSelect}
+              onCopy={handleCopyClick}
+            />
+          {/each}
+        </div>
+      {:else}
+        <div class="space-y-2">
+          {#each filteredPatches as patch (patch.id)}
+            <PatchCard
+              {patch}
+              listView
+              isSelected={selectedPatchId === patch.id}
+              onSelect={handlePatchSelect}
+              onCopy={handleCopyClick}
+            />
+          {/each}
+        </div>
+      {/if}
+    </div>
+
+    <!-- Sidebar wrapper with slide animation -->
+    <div
+      class="transition-all duration-200 ease-out overflow-hidden {sidebarMode ? 'w-[360px]' : 'w-0'}"
+    >
+      {#if sidebarMode === 'edit'}
+        <PatchEditorSidebar
+          patch={selectedPatchObj}
+          onClose={handleSidebarClose}
+          onSaved={handleEditSaved}
+          onDeleted={handlePatchDeleted}
+        />
+      {:else if sidebarMode === 'copy'}
+        <CopyPatchSidebar
+          patch={selectedPatchForCopy}
+          {libraries}
+          onClose={handleSidebarClose}
+          onSubmit={handleCopySubmit}
+        />
+      {/if}
+    </div>
   </div>
 </div>
-
-<!-- Copy Patch Modal -->
-<CopyPatchModal
-  open={showCopyModal}
-  patch={selectedPatchForCopy}
-  {libraries}
-  onClose={() => { showCopyModal = false; selectedPatchForCopy = null; }}
-  onSubmit={handleCopySubmit}
-/>
-
-<!-- Edit Patch Modal -->
-<PatchEditModal
-  open={showEditModal}
-  patch={selectedPatchForEdit}
-  onClose={() => { showEditModal = false; selectedPatchForEdit = null; }}
-  onSaved={handleEditSaved}
-/>
 
 <!-- Status Message -->
 {#if statusMessage}

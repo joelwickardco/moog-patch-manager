@@ -1,12 +1,13 @@
 <script>
   import { updateLibrary } from "../../utils/api.js";
-  import version from "../../../../version.txt?raw";
+
+  const version = __APP_VERSION__;
 
   let {
-    activeTab = $bindable(),
     libraries = [],
     selectedLibraryId = $bindable(),
     onImport = () => {},
+    onImportDirectory = () => {},
     importing = false,
     onExport = () => {},
     exporting = false,
@@ -18,15 +19,10 @@
   let editedLibraryName = $state("");
   let nameInputElement = $state(null);
   let renameError = $state(null);
-
-  const tabs = [
-    { id: "library", label: "Library", icon: "folder" },
-    { id: "banks", label: "Banks", icon: "bank" },
-  ];
+  let showImportMenu = $state(false);
 
   function selectLibrary(libraryId) {
     selectedLibraryId = libraryId;
-    activeTab = "library";
   }
 
   function getLibraryColor(library) {
@@ -78,29 +74,33 @@
       cancelLibraryEdit();
     }
   }
+
+  function handleClickOutside(e) {
+    if (showImportMenu && !e.target.closest('.import-menu-container')) {
+      showImportMenu = false;
+    }
+  }
+
+  $effect(() => {
+    if (showImportMenu) {
+      document.addEventListener('click', handleClickOutside);
+      return () => {
+        document.removeEventListener('click', handleClickOutside);
+      };
+    }
+  });
 </script>
 
 <aside class="w-64 bg-surface border-r border-border flex flex-col">
   <div class="p-4 border-b border-border">
     <h1 class="text-xl font-bold text-primary">Moog Muse</h1>
     <p class="text-sm text-text-secondary">
-      Patch Manager <span class="text-xs opacity-70">v{version.trim()}</span>
+      Patch Manager <span class="text-xs opacity-70">v{version}</span>
     </p>
   </div>
 
   <nav class="flex-1 p-2 overflow-y-auto">
-    {#each tabs as tab}
-      <button
-        class="w-full text-left px-4 py-3 rounded-lg mb-1 transition-colors {activeTab === tab.id
-          ? 'bg-primary/20 text-primary'
-          : 'hover:bg-border text-text-secondary'}"
-        onclick={() => (activeTab = tab.id)}
-      >
-        {tab.label}
-      </button>
-    {/each}
-
-    <div class="mt-4 pt-4 border-t border-border">
+    <div>
       <div class="flex items-center justify-between px-4 mb-2">
         <h3 class="text-xs font-semibold text-text-secondary uppercase tracking-wider">
           Libraries
@@ -115,7 +115,7 @@
       </div>
       <button
         class="w-full text-left px-4 py-2 rounded-lg transition-colors flex items-center gap-2
-          {selectedLibraryId === null && activeTab === 'library'
+          {selectedLibraryId === null
             ? 'bg-primary/20 text-primary'
             : 'hover:bg-border text-text-secondary'}"
         onclick={() => selectLibrary(null)}
@@ -128,7 +128,7 @@
       </button>
       {#each libraries as library}
         <div class="w-full px-4 py-2 rounded-lg transition-colors flex items-center gap-2 group
-          {selectedLibraryId === library.id && activeTab === 'library'
+          {selectedLibraryId === library.id
             ? 'bg-primary/20 text-primary'
             : 'hover:bg-border text-text-secondary'}">
 
@@ -192,13 +192,48 @@
   </nav>
 
   <div class="p-4 border-t border-border space-y-2">
-    <button
-      class="w-full px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-      onclick={onImport}
-      disabled={importing}
-    >
-      {importing ? "Importing..." : "Import"}
-    </button>
+    <div class="relative import-menu-container">
+      <div class="flex gap-1">
+        <button
+          class="flex-1 px-4 py-2 bg-primary text-white rounded-l-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          onclick={onImport}
+          disabled={importing}
+        >
+          {importing ? "Importing..." : "Import ZIP"}
+        </button>
+        <button
+          class="px-3 py-2 bg-primary text-white rounded-r-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-l border-white/20"
+          onclick={() => showImportMenu = !showImportMenu}
+          disabled={importing}
+        >
+          ▼
+        </button>
+      </div>
+      {#if showImportMenu}
+        <div class="absolute bottom-full left-0 right-0 mb-1 bg-surface border border-border rounded-lg shadow-lg overflow-hidden z-10">
+          <button
+            class="w-full px-4 py-2 text-left hover:bg-border text-text-primary transition-colors"
+            onclick={() => {
+              showImportMenu = false;
+              onImport();
+            }}
+            disabled={importing}
+          >
+            Import ZIP File
+          </button>
+          <button
+            class="w-full px-4 py-2 text-left hover:bg-border text-text-primary transition-colors"
+            onclick={() => {
+              showImportMenu = false;
+              onImportDirectory();
+            }}
+            disabled={importing}
+          >
+            Import Directory
+          </button>
+        </div>
+      {/if}
+    </div>
     <button
       class="w-full px-4 py-2 bg-secondary text-white rounded-lg hover:bg-secondary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       onclick={onExport}
