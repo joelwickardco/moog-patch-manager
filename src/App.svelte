@@ -48,8 +48,16 @@
   });
 
   async function loadBanks(libraryId) {
-    banksLoading = true;
-    if (libraryId !== lastLoadedLibraryId) {
+    const isLibraryChange = libraryId !== lastLoadedLibraryId;
+
+    // Only show loading indicator when changing libraries or on initial load
+    if (isLibraryChange || banks.length === 0) {
+      banksLoading = true;
+    } else {
+      banksLoading = false;
+    }
+
+    if (isLibraryChange) {
       selectedBankNumber = 1;
     }
     lastLoadedLibraryId = libraryId;
