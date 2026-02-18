@@ -96,7 +96,6 @@
 {#if listView}
   <div
     class={containerClasses}
-    role="option"
     tabindex="0"
     aria-label={generatePatchStateAriaLabel(patch)}
     aria-selected={isSelected}
