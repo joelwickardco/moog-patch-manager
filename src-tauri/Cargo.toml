@@ -1,6 +1,6 @@
 [package]
 name = "muse-patch-manager"
-version = "1.0.3"
+version = "1.0.4"
 description = "Moog Muse Patch Manager"
 authors = ["Joel Wickard"]
 license = "MIT"
