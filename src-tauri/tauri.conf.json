@@ -28,6 +28,7 @@
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": ["app", "dmg", "msi", "nsis", "deb"],
     "icon": [
       "icons/32x32.png",
@@ -64,7 +65,7 @@
       "open": true
     },
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDU5NjMxODA1Q0I4RDlBQzQKUldURW1vM0xCUmhqV1ZlcTVkUW50eUkxbXZkQzh1b1hpempKb0R2U1dDejN0L3EzWHFvVkFzd3EK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDMxMTM3OTgzRjJCQTUyMzgKUldRNFVycnlnM2tUTVF4L3IySmRRZTE5alluZmZkMGY5ZkluakNnTHhRUTJ3NVgrc0tKK1hpU2cK",
       "endpoints": [
         "https://github.com/joelwickardco/moog-patch-manager/releases/latest/download/latest.json"
       ]
