@@ -1,6 +1,7 @@
 <script>
   import { check } from "@tauri-apps/plugin-updater";
   import { relaunch } from "@tauri-apps/plugin-process";
+  import { listen } from "@tauri-apps/api/event";
 
   let visible = $state(false);
   let update = $state(null);
@@ -9,19 +10,30 @@
   let progress = $state(0);
   let totalSize = $state(0);
   let error = $state(null);
+  let upToDate = $state(false);
 
+  // Automatic check on startup
   $effect(() => {
-    // Delay the check slightly so the app fully loads first
-    const timer = setTimeout(checkForUpdate, 3000);
+    const timer = setTimeout(() => checkForUpdate(false), 3000);
     return () => clearTimeout(timer);
   });
 
-  async function checkForUpdate() {
+  // Listen for "Check for Updates..." from the native app menu
+  $effect(() => {
+    const unlisten = listen("menu:check-for-updates", () => checkForUpdate(true));
+    return () => { unlisten.then(fn => fn()); };
+  });
+
+  async function checkForUpdate(isManual) {
+    upToDate = false;
     try {
       const result = await check();
       if (result) {
         update = result;
         visible = true;
+      } else if (isManual) {
+        upToDate = true;
+        setTimeout(() => { upToDate = false; }, 3000);
       }
     } catch (e) {
       // Silently ignore update check failures (offline, misconfigured key, dev mode)
@@ -62,6 +74,12 @@
     totalSize > 0 ? Math.min(100, Math.round((progress / totalSize) * 100)) : 0
   );
 </script>
+
+{#if upToDate}
+  <div class="fixed bottom-4 left-1/2 -translate-x-1/2 bg-surface border border-border rounded-lg px-4 py-2 shadow-lg text-sm text-text-secondary z-50">
+    You're up to date
+  </div>
+{/if}
 
 {#if visible && update}
   <div
