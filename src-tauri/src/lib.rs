@@ -5,7 +5,10 @@ mod moog;
 mod utils;
 
 use std::sync::Mutex;
-use tauri::Manager;
+#[cfg(target_os = "macos")]
+use tauri::menu::PredefinedMenuItem;
+use tauri::menu::{Menu, MenuItem, Submenu};
+use tauri::{Emitter, Manager};
 
 pub struct AppState {
     pub db: Mutex<db::Database>,
@@ -17,7 +20,77 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
+            // Build native application menu
+            let check_updates = MenuItem::with_id(
+                app,
+                "check_updates",
+                "Check for Updates...",
+                true,
+                None::<&str>,
+            )?;
+
+            #[cfg(target_os = "macos")]
+            {
+                let app_menu = Submenu::with_items(
+                    app,
+                    "Muse Patch Manager",
+                    true,
+                    &[
+                        &PredefinedMenuItem::about(app, None, None)?,
+                        &PredefinedMenuItem::separator(app)?,
+                        &check_updates,
+                        &PredefinedMenuItem::separator(app)?,
+                        &PredefinedMenuItem::hide(app, None)?,
+                        &PredefinedMenuItem::hide_others(app, None)?,
+                        &PredefinedMenuItem::show_all(app, None)?,
+                        &PredefinedMenuItem::separator(app)?,
+                        &PredefinedMenuItem::quit(app, None)?,
+                    ],
+                )?;
+
+                let edit_menu = Submenu::with_items(
+                    app,
+                    "Edit",
+                    true,
+                    &[
+                        &PredefinedMenuItem::cut(app, None)?,
+                        &PredefinedMenuItem::copy(app, None)?,
+                        &PredefinedMenuItem::paste(app, None)?,
+                        &PredefinedMenuItem::select_all(app, None)?,
+                    ],
+                )?;
+
+                let window_menu = Submenu::with_items(
+                    app,
+                    "Window",
+                    true,
+                    &[
+                        &PredefinedMenuItem::minimize(app, None)?,
+                        &PredefinedMenuItem::close_window(app, None)?,
+                    ],
+                )?;
+
+                let menu = Menu::with_items(app, &[&app_menu, &edit_menu, &window_menu])?;
+                app.set_menu(menu)?;
+            }
+
+            #[cfg(not(target_os = "macos"))]
+            {
+                let help_menu = Submenu::with_items(app, "Help", true, &[&check_updates])?;
+
+                let menu = Menu::with_items(app, &[&help_menu])?;
+                app.set_menu(menu)?;
+            }
+
+            app.on_menu_event(|app, event| {
+                if event.id() == "check_updates" {
+                    let _ = app.emit("menu:check-for-updates", ());
+                }
+            });
+
             // Initialize database in app data directory
             let app_data_dir = app
                 .path()
