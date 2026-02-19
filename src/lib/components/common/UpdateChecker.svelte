@@ -11,6 +11,7 @@
   let totalSize = $state(0);
   let error = $state(null);
   let upToDate = $state(false);
+  let checkFailed = $state(false);
 
   // Automatic check on startup
   $effect(() => {
@@ -26,6 +27,7 @@
 
   async function checkForUpdate(isManual) {
     upToDate = false;
+    checkFailed = false;
     try {
       const result = await check();
       if (result) {
@@ -36,7 +38,11 @@
         setTimeout(() => { upToDate = false; }, 3000);
       }
     } catch (e) {
-      // Silently ignore update check failures (offline, misconfigured key, dev mode)
+      if (isManual) {
+        checkFailed = true;
+        setTimeout(() => { checkFailed = false; }, 3000);
+      }
+      // Silently ignore automatic check failures (offline, misconfigured key, dev mode)
       console.debug("Update check skipped:", e);
     }
   }
@@ -78,6 +84,12 @@
 {#if upToDate}
   <div class="fixed bottom-4 left-1/2 -translate-x-1/2 bg-surface border border-border rounded-lg px-4 py-2 shadow-lg text-sm text-text-secondary z-50">
     You're up to date
+  </div>
+{/if}
+
+{#if checkFailed}
+  <div class="fixed bottom-4 left-1/2 -translate-x-1/2 bg-surface border border-border rounded-lg px-4 py-2 shadow-lg text-sm text-text-secondary z-50">
+    Unable to check for updates
   </div>
 {/if}
 
