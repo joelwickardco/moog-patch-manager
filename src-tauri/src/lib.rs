@@ -5,8 +5,8 @@ mod moog;
 mod utils;
 
 use std::sync::Mutex;
-use tauri::{Emitter, Manager};
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
+use tauri::{Emitter, Manager};
 
 pub struct AppState {
     pub db: Mutex<db::Database>,
@@ -22,7 +22,13 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .setup(|app| {
             // Build native application menu
-            let check_updates = MenuItem::with_id(app, "check_updates", "Check for Updates...", true, None::<&str>)?;
+            let check_updates = MenuItem::with_id(
+                app,
+                "check_updates",
+                "Check for Updates...",
+                true,
+                None::<&str>,
+            )?;
 
             #[cfg(target_os = "macos")]
             {
@@ -71,12 +77,7 @@ pub fn run() {
 
             #[cfg(not(target_os = "macos"))]
             {
-                let help_menu = Submenu::with_items(
-                    app,
-                    "Help",
-                    true,
-                    &[&check_updates],
-                )?;
+                let help_menu = Submenu::with_items(app, "Help", true, &[&check_updates])?;
 
                 let menu = Menu::with_items(app, &[&help_menu])?;
                 app.set_menu(menu)?;
