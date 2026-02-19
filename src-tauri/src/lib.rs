@@ -5,9 +5,9 @@ mod moog;
 mod utils;
 
 use std::sync::Mutex;
-use tauri::menu::{Menu, MenuItem, Submenu};
 #[cfg(target_os = "macos")]
 use tauri::menu::PredefinedMenuItem;
+use tauri::menu::{Menu, MenuItem, Submenu};
 use tauri::{Emitter, Manager};
 
 pub struct AppState {
