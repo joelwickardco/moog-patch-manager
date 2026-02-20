@@ -76,6 +76,15 @@
     visible = false;
   }
 
+  async function restartApp() {
+    try {
+      await relaunch();
+    } catch (e) {
+      console.error("Failed to restart app:", e);
+      error = `Failed to restart: ${e}`;
+    }
+  }
+
   let progressPercent = $derived(
     totalSize > 0 ? Math.min(100, Math.round((progress / totalSize) * 100)) : 0
   );
@@ -170,7 +179,7 @@
             </button>
             <button
               type="button"
-              onclick={relaunch}
+              onclick={restartApp}
               class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors text-sm"
             >
               Restart Now
