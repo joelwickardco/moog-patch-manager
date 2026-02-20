@@ -82,13 +82,13 @@
 </script>
 
 {#if upToDate}
-  <div class="fixed bottom-4 left-1/2 -translate-x-1/2 bg-surface border border-border rounded-lg px-4 py-2 shadow-lg text-sm text-text-secondary z-50">
+  <div class="fixed top-4 left-1/2 -translate-x-1/2 bg-primary text-white rounded-lg px-5 py-3 shadow-lg text-sm font-medium z-50 animate-toast-in">
     You're up to date
   </div>
 {/if}
 
 {#if checkFailed}
-  <div class="fixed bottom-4 left-1/2 -translate-x-1/2 bg-surface border border-border rounded-lg px-4 py-2 shadow-lg text-sm text-text-secondary z-50">
+  <div class="fixed top-4 left-1/2 -translate-x-1/2 bg-red-500 text-white rounded-lg px-5 py-3 shadow-lg text-sm font-medium z-50 animate-toast-in">
     Unable to check for updates
   </div>
 {/if}
